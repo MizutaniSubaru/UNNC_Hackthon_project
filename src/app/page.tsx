@@ -32,11 +32,17 @@ export default function Home() {
       });
       const aiData = await res.json();
 
+      // 【关键校验】如果金额是 0 且没有解析到，则拦截报错
+      if (aiData.amount === 0) {
+        alert('抱歉，AI 没听清你花了多少钱，请再说清楚一点（例如：买咖啡花了 20 元）');
+        return;
+      }
+
       // 第二步：使用 Supabase SDK 将结果直接存入数据库
       const { error } = await supabase.from('expenses').insert([{
         amount: aiData.amount,
         category: aiData.category,
-        description: aiData.description || text,
+        description: aiData.description,
       }]);
 
       if (error) alert('Error saving to Supabase: ' + error.message);
