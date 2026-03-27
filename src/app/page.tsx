@@ -56,6 +56,11 @@ export default function Home() {
 
       const aiData = await res.json();
 
+      if (!res.ok) {
+        alert(aiData.error || 'Failed to analyze the expense.');
+        return;
+      }
+
       const { error } = await supabase.from('expenses').insert([
         {
           amount: aiData.amount,

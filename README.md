@@ -50,7 +50,7 @@ Create a `.env.local` file with the following values when you want to enable AI 
 ```bash
 KIMI_API_KEY=
 KIMI_BASE_URL=https://api.moonshot.cn/v1
-KIMI_MODEL=moonshot/kimi-k2.5
+KIMI_MODEL=kimi-k2.5
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
