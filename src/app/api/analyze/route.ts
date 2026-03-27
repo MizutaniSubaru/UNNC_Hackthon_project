@@ -3,20 +3,22 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.KIMI_API_KEY;
+    const baseURL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
+    const model = process.env.KIMI_MODEL || 'moonshot/kimi-k2.5';
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'OPENAI_API_KEY is not configured' },
+        { error: 'KIMI_API_KEY is not configured' },
         { status: 500 }
       );
     }
 
-    const openai = new OpenAI({ apiKey });
+    const openai = new OpenAI({ apiKey, baseURL });
     const { text } = await req.json();
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model,
       messages: [
         {
           role: 'system',

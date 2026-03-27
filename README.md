@@ -48,7 +48,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 Create a `.env.local` file with the following values when you want to enable AI and Supabase features:
 
 ```bash
-OPENAI_API_KEY=
+KIMI_API_KEY=
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+KIMI_MODEL=moonshot/kimi-k2.5
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
