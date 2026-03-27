@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import type { DatesSetArg, EventClickArg, EventInput } from '@fullcalendar/core';
+import type { EventClickArg, EventInput } from '@fullcalendar/core';
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import FullCalendar from '@fullcalendar/react';
@@ -93,7 +93,7 @@ export function CalendarFull({
     }
   }, [focusDate]);
 
-  function handleDatesSet(_args: DatesSetArg) {
+  function handleDatesSet() {
     const calendarApi = calendarRef.current?.getApi();
 
     if (!calendarApi) {
@@ -140,13 +140,16 @@ export function CalendarFull({
             left: 'prev,next today',
             right: 'dayGridMonth,timeGridWeek',
           }}
-          height="auto"
+          height={760}
           initialDate={focusDate}
           initialView="dayGridMonth"
           locale={isChinese ? 'zh-cn' : 'en'}
           locales={[zhCnLocale]}
+          nowIndicator
           plugins={[dayGridPlugin, timeGridPlugin]}
           ref={calendarRef}
+          scrollTime="07:00:00"
+          slotDuration="00:30:00"
         />
       </div>
     </section>

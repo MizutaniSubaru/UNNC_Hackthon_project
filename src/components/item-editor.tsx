@@ -1,8 +1,13 @@
 'use client';
 
 import { EVENT_STATUSES, GROUPS, PRIORITIES, TODO_STATUSES } from '@/lib/constants';
+import { DateTimeWheelPicker } from '@/components/date-time-wheel-picker';
 import { COPY } from '@/lib/copy';
-import { toDateInputValue, toDateTimeInputValue } from '@/lib/time';
+import {
+  isEndAfterStart,
+  toDateInputValue,
+  toDateTimeInputValue,
+} from '@/lib/time';
 import type { Item } from '@/lib/types';
 
 type ItemEditorProps = {
@@ -12,6 +17,20 @@ type ItemEditorProps = {
   onDelete: (item: Item) => void;
   onSave: (item: Item) => void;
 };
+
+function ensureEndAfterStartValue(startAt: string | null, endAt: string | null) {
+  if (!startAt || !endAt || isEndAfterStart(startAt, endAt)) {
+    return endAt;
+  }
+
+  const start = new Date(startAt);
+  if (Number.isNaN(start.getTime())) {
+    return endAt;
+  }
+
+  start.setMinutes(start.getMinutes() + 30);
+  return toDateTimeInputValue(start);
+}
 
 export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEditorProps) {
   const copy = locale.startsWith('zh') ? COPY.zh : COPY.en;
@@ -32,6 +51,37 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
   }
 
   const statusOptions = item.type === 'event' ? EVENT_STATUSES : TODO_STATUSES;
+  const invalidRange =
+    item.type === 'event' &&
+    !item.is_all_day &&
+    item.start_at &&
+    item.end_at &&
+    !isEndAfterStart(item.start_at, item.end_at);
+
+  function handleStartConfirm(nextStart: string) {
+    if (!item) {
+      return;
+    }
+
+    const nextEnd = ensureEndAfterStartValue(nextStart, item.end_at);
+    onChange({
+      ...item,
+      end_at: nextEnd,
+      start_at: nextStart,
+    });
+  }
+
+  function handleEndConfirm(nextEndInput: string) {
+    if (!item) {
+      return;
+    }
+
+    const nextEnd = ensureEndAfterStartValue(item.start_at, nextEndInput);
+    onChange({
+      ...item,
+      end_at: nextEnd,
+    });
+  }
 
   return (
     <section className="planner-panel planner-panel--editor">
@@ -137,24 +187,32 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
           <>
             <label className="field">
               <span>{copy.labels.start}</span>
-              <input
-                onChange={(event) =>
-                  onChange({ ...item, start_at: event.target.value || null })
-                }
-                type="datetime-local"
-                value={toDateTimeInputValue(item.start_at)}
+              <DateTimeWheelPicker
+                locale={locale}
+                onConfirm={handleStartConfirm}
+                value={item.start_at}
               />
             </label>
 
             <label className="field">
               <span>{copy.labels.end}</span>
-              <input
-                onChange={(event) => onChange({ ...item, end_at: event.target.value || null })}
-                type="datetime-local"
-                value={toDateTimeInputValue(item.end_at)}
+              <DateTimeWheelPicker
+                locale={locale}
+                minValue={item.start_at}
+                onConfirm={handleEndConfirm}
+                strictAfterMin
+                value={item.end_at}
               />
             </label>
           </>
+        ) : null}
+
+        {!item.is_all_day && invalidRange ? (
+          <p className="panel-note panel-note--warning field--full">
+            {locale.startsWith('zh')
+              ? '结束时间必须晚于开始时间。'
+              : 'End time must be later than start time.'}
+          </p>
         ) : null}
 
         <label className="field field--full">

@@ -54,19 +54,44 @@ function deriveEndAt(startAt: string | null, estimatedMinutes: number | null) {
   return addMinutes(startAt, estimatedMinutes ?? DEFAULT_EVENT_MINUTES);
 }
 
+function assertValidEventRange(
+  type: ItemType,
+  isAllDay: boolean,
+  startAt: string | null,
+  endAt: string | null
+) {
+  if (type !== 'event' || isAllDay || !startAt || !endAt) {
+    return;
+  }
+
+  const startDate = new Date(startAt);
+  const endDate = new Date(endAt);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    throw new Error('Invalid start or end datetime.');
+  }
+
+  if (endDate.getTime() <= startDate.getTime()) {
+    throw new Error('End time must be later than start time.');
+  }
+}
+
 export function normalizeCreatePayload(payload: Partial<CreateItemPayload>) {
   const type = asType(payload.type);
   const isAllDay = Boolean(payload.is_all_day);
   const estimatedMinutes = asMinutes(payload.estimated_minutes, type === 'event' ? 60 : 45);
   const startAt = asNullableString(payload.start_at);
   const dueDate = asNullableString(payload.due_date);
+  const endAt =
+    type === 'event' && !isAllDay
+      ? asNullableString(payload.end_at) ?? deriveEndAt(startAt, estimatedMinutes)
+      : null;
+
+  assertValidEventRange(type, isAllDay, startAt, endAt);
 
   return {
     due_date: isAllDay ? dueDate : dueDate,
-    end_at:
-      type === 'event' && !isAllDay
-        ? asNullableString(payload.end_at) ?? deriveEndAt(startAt, estimatedMinutes)
-        : null,
+    end_at: endAt,
     estimated_minutes: estimatedMinutes,
     group_key: asGroupKey(payload.group_key),
     is_all_day: isAllDay,
@@ -103,16 +128,19 @@ export function normalizeUpdatePayload(
   );
   const startAt =
     payload.start_at !== undefined ? asNullableString(payload.start_at) : currentItem.start_at;
+  const endAt =
+    type === 'event' && !isAllDay
+      ? payload.end_at !== undefined
+        ? asNullableString(payload.end_at) ?? deriveEndAt(startAt, estimatedMinutes)
+        : currentItem.end_at ?? deriveEndAt(startAt, estimatedMinutes)
+      : null;
+
+  assertValidEventRange(type, isAllDay, startAt, endAt);
 
   return {
     due_date:
       payload.due_date !== undefined ? asNullableString(payload.due_date) : currentItem.due_date,
-    end_at:
-      type === 'event' && !isAllDay
-        ? payload.end_at !== undefined
-          ? asNullableString(payload.end_at) ?? deriveEndAt(startAt, estimatedMinutes)
-          : currentItem.end_at ?? deriveEndAt(startAt, estimatedMinutes)
-        : null,
+    end_at: endAt,
     estimated_minutes: estimatedMinutes,
     group_key:
       payload.group_key !== undefined
