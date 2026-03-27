@@ -1,2 +1,0 @@
-[ 2743237ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=GQsWtZSeFj3erqM8az5jd' failed: WebSocket opening handshake timed out @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
-[ 4285348ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=bwKYi4zsDYmR_vjcSNZ2Y' failed: WebSocket opening handshake timed out @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
