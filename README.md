@@ -10,6 +10,10 @@ An AI-first task calendar manager built with `Next.js`, `Bun`, and `Supabase`.
 - Confirmation card before creating ambiguous or inferred events
 - Month view, week view, and filtered to-do rail
 - Activity timeline for created, updated, completed, and deleted items
+- Enter key shortcut for parsing in the intake box (`Shift+Enter` keeps newline)
+- Event time guard: end time must be later than start time
+- Scrollable time picker for start/end selection in confirmation and editor panels
+- Completed/cancelled items are removed from schedule and active to-do rail views
 
 ## Requirements
 
@@ -50,6 +54,8 @@ bun run dev
 bun run lint
 bun run build
 ```
+
+`bun run dev` uses webpack mode by default for better local stability on Windows.
 
 ## Notes
 

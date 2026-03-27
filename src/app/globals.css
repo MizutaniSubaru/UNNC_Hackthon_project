@@ -316,6 +316,190 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.wheel-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.wheel-picker__triggers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wheel-picker__trigger {
+  border: 1px solid rgba(156, 174, 208, 0.42);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: #2b3e5f;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 0.84rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.wheel-picker__overlay {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(12, 23, 41, 0.2);
+  z-index: 39;
+}
+
+.wheel-picker__popover {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(92vw, 320px);
+  transform: translate(-50%, -50%);
+  z-index: 40;
+}
+
+.wheel-picker__panel {
+  border: 1px solid rgba(158, 178, 219, 0.35);
+  border-radius: 18px;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(246, 249, 255, 0.96), rgba(237, 243, 255, 0.93));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 14px 30px rgba(48, 79, 137, 0.22);
+}
+
+.wheel-picker__title {
+  margin-bottom: 8px;
+  color: #20314b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.wheel-picker__triple,
+.wheel-picker__double {
+  display: grid;
+  gap: 0;
+  position: relative;
+  border: 1px solid rgba(156, 174, 208, 0.28);
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(237, 243, 255, 0.72));
+}
+
+.wheel-picker__triple::after,
+.wheel-picker__double::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 24px;
+  transform: translateY(-50%);
+  border-top: 1px dashed rgba(102, 150, 236, 0.34);
+  border-bottom: 1px dashed rgba(102, 150, 236, 0.34);
+  background: rgba(123, 168, 242, 0.11);
+  pointer-events: none;
+}
+
+.wheel-picker__triple {
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+}
+
+.wheel-picker__double {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wheel-picker__header {
+  display: grid;
+  margin-bottom: 3px;
+  color: #6f819e;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.wheel-picker__header--date {
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+}
+
+.wheel-picker__select {
+  overflow-y: auto;
+  border: 0;
+  border-right: 1px solid rgba(156, 174, 208, 0.24);
+  border-radius: 0;
+  padding: 2px 0;
+  color: #5d6f8b;
+  background: transparent;
+  font-size: 0.98rem;
+  text-align: center;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wheel-picker__select::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.wheel-picker__select:last-child {
+  border-right: 0;
+}
+
+.wheel-picker__select option {
+  padding: 1px 2px;
+  font-weight: 500;
+}
+
+.wheel-picker__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.wheel-picker__hint {
+  color: #8a3b21;
+  font-size: 0.8rem;
+}
+
+.wheel-picker__button {
+  min-width: 76px;
+  border: 1px solid rgba(156, 174, 208, 0.42);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+.wheel-picker__button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(79, 109, 168, 0.18);
+}
+
+.wheel-picker__button--cancel {
+  color: #6f819e;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(239, 244, 252, 0.92));
+}
+
+.wheel-picker__button--confirm {
+  color: #1e2e48;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(230, 238, 255, 0.9));
+}
+
+.wheel-picker__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wheel-picker__feedback {
+  display: flex;
+  justify-content: center;
+}
+
 .field--full {
   grid-column: 1 / -1;
 }
@@ -809,6 +993,7 @@ button:disabled {
 }
 
 @media (max-width: 1180px) {
+
   .planner-grid--top,
   .planner-grid--bottom {
     grid-template-columns: 1fr;
@@ -826,6 +1011,19 @@ button:disabled {
   .todo-filters,
   .editor-grid {
     grid-template-columns: 1fr;
+  }
+
+  .wheel-picker__triple,
+  .wheel-picker__double {
+    grid-template-columns: 1fr;
+  }
+
+  .wheel-picker__actions {
+    justify-content: space-between;
+  }
+
+  .wheel-picker__popover {
+    width: min(94vw, 300px);
   }
 
   .planner-hero,

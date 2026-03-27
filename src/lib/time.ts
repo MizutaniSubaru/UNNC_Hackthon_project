@@ -176,6 +176,50 @@ export function toDateTimeInputValue(date: DateLike) {
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
 
+export function toTimeInputValue(date: DateLike) {
+  const value = toDate(date);
+  if (!value) {
+    return '';
+  }
+
+  return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+export function buildTimeOptions(stepMinutes = 30) {
+  const step = Math.max(1, Math.min(60, Math.round(stepMinutes)));
+  const total = Math.floor((24 * 60) / step);
+
+  return Array.from({ length: total }, (_, index) => {
+    const minutes = index * step;
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    return `${pad(hour)}:${pad(minute)}`;
+  });
+}
+
+export function combineLocalDateAndTime(
+  datePart: string | null | undefined,
+  timePart: string | null | undefined
+) {
+  if (!datePart) {
+    return null;
+  }
+
+  const time = timePart && /^\d{2}:\d{2}$/.test(timePart) ? timePart : '00:00';
+  return `${datePart}T${time}`;
+}
+
+export function isEndAfterStart(start: DateLike, end: DateLike) {
+  const startDate = toDate(start);
+  const endDate = toDate(end);
+
+  if (!startDate || !endDate) {
+    return true;
+  }
+
+  return endDate.getTime() > startDate.getTime();
+}
+
 export function addMinutes(value: string, minutes: number) {
   const date = new Date(value);
   date.setMinutes(date.getMinutes() + minutes);

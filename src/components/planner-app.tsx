@@ -14,10 +14,12 @@ import { COPY } from '@/lib/copy';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import {
   formatDateTimeLabel,
+  isEndAfterStart,
   sortItems,
   toDateInputValue,
   toDateTimeInputValue,
 } from '@/lib/time';
+import { DateTimeWheelPicker } from '@/components/date-time-wheel-picker';
 import type {
   ActivityAction,
   ActivityLog,
@@ -84,6 +86,33 @@ function toIsoOrNull(value: string | null | undefined) {
 
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function ensureEndAfterStartValue(startAt: string | null, endAt: string | null) {
+  if (!startAt || !endAt || isEndAfterStart(startAt, endAt)) {
+    return endAt;
+  }
+
+  const start = new Date(startAt);
+  if (Number.isNaN(start.getTime())) {
+    return endAt;
+  }
+
+  start.setMinutes(start.getMinutes() + 30);
+  return toDateTimeInputValue(start);
+}
+
+function hasInvalidTimedEventRange(input: {
+  end_at: string | null;
+  is_all_day: boolean;
+  start_at: string | null;
+  type: string;
+}) {
+  if (input.type !== 'event' || input.is_all_day || !input.start_at || !input.end_at) {
+    return false;
+  }
+
+  return !isEndAfterStart(input.start_at, input.end_at);
 }
 
 async function fetchWorkspace(
@@ -158,6 +187,12 @@ function IntakePanel({
         <textarea
           className="composer-textarea"
           onChange={(event) => setComposerText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !busy && text.trim()) {
+              event.preventDefault();
+              onAnalyze();
+            }
+          }}
           placeholder={
             locale.startsWith('zh')
               ? '例如：明天下午 3 点和导师开会；或者：记得买打印纸'
@@ -206,6 +241,31 @@ function ConfirmationPanel({
         </div>
       </section>
     );
+  }
+
+  function handleDraftStartConfirm(nextStart: string) {
+    if (!draft) {
+      return;
+    }
+
+    const nextEnd = ensureEndAfterStartValue(nextStart, draft.end_at);
+    onChange({
+      ...draft,
+      end_at: nextEnd,
+      start_at: nextStart,
+    });
+  }
+
+  function handleDraftEndConfirm(nextEndInput: string) {
+    if (!draft) {
+      return;
+    }
+
+    const nextEnd = ensureEndAfterStartValue(draft.start_at, nextEndInput);
+    onChange({
+      ...draft,
+      end_at: nextEnd,
+    });
   }
 
   return (
@@ -336,32 +396,32 @@ function ConfirmationPanel({
           <>
             <label className="field">
               <span>{copy.labels.start}</span>
-              <input
-                onChange={(event) =>
-                  onChange({
-                    ...draft,
-                    start_at: event.target.value || null,
-                  })
-                }
-                type="datetime-local"
-                value={toDateTimeInputValue(draft.start_at)}
+              <DateTimeWheelPicker
+                locale={locale}
+                onConfirm={handleDraftStartConfirm}
+                value={draft.start_at}
               />
             </label>
 
             <label className="field">
               <span>{copy.labels.end}</span>
-              <input
-                onChange={(event) =>
-                  onChange({
-                    ...draft,
-                    end_at: event.target.value || null,
-                  })
-                }
-                type="datetime-local"
-                value={toDateTimeInputValue(draft.end_at)}
+              <DateTimeWheelPicker
+                locale={locale}
+                minValue={draft.start_at}
+                onConfirm={handleDraftEndConfirm}
+                strictAfterMin
+                value={draft.end_at}
               />
             </label>
           </>
+        ) : null}
+
+        {!draft.is_all_day && hasInvalidTimedEventRange(draft) ? (
+          <p className="panel-note panel-note--warning field--full">
+            {locale.startsWith('zh')
+              ? '结束时间必须晚于开始时间。'
+              : 'End time must be later than start time.'}
+          </p>
         ) : null}
 
         <label className="field field--full">
@@ -438,9 +498,6 @@ function TodoRail({
         <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
           <option value="all">{locale.startsWith('zh') ? '全部状态' : 'All statuses'}</option>
           <option value="pending">pending</option>
-          <option value="completed">completed</option>
-          <option value="scheduled">scheduled</option>
-          <option value="cancelled">cancelled</option>
         </select>
         <select onChange={(event) => setGroupFilter(event.target.value)} value={groupFilter}>
           <option value="all">{locale.startsWith('zh') ? '全部分组' : 'All groups'}</option>
@@ -674,6 +731,15 @@ export function PlannerApp() {
       return;
     }
 
+    if (hasInvalidTimedEventRange(draft)) {
+      setMessage(
+        locale.startsWith('zh')
+          ? '结束时间必须晚于开始时间。'
+          : 'End time must be later than start time.'
+      );
+      return;
+    }
+
     setBusy(true);
     setMessage(null);
 
@@ -710,6 +776,15 @@ export function PlannerApp() {
   }
 
   async function handleSaveItem(item: Item) {
+    if (hasInvalidTimedEventRange(item)) {
+      setMessage(
+        locale.startsWith('zh')
+          ? '结束时间必须晚于开始时间。'
+          : 'End time must be later than start time.'
+      );
+      return;
+    }
+
     setBusy(true);
     setMessage(null);
 
@@ -767,14 +842,27 @@ export function PlannerApp() {
 
   async function handleQuickStatus(item: Item, status: string) {
     await handleSaveItem({ ...item, status });
+
+    if (status === 'completed' || status === 'cancelled') {
+      setItems((current) => current.filter((entry) => entry.id !== item.id));
+      setSelectedItem((current) => (current?.id === item.id ? null : current));
+    }
   }
 
-  const calendarItems = items.filter(
+  const activeItems = items.filter(
+    (item) => item.status !== 'completed' && item.status !== 'cancelled'
+  );
+
+  const calendarItems = activeItems.filter(
     (item) => item.type === 'event' || (item.is_all_day && Boolean(item.due_date))
   );
 
   const filteredTodos = sortItems(
-    items.filter((item) => {
+    activeItems.filter((item) => {
+      if (item.type !== 'todo') {
+        return false;
+      }
+
       const haystack = `${item.title} ${item.location ?? ''} ${item.notes ?? ''}`.toLowerCase();
 
       if (deferredSearch.trim() && !haystack.includes(deferredSearch.toLowerCase())) {
