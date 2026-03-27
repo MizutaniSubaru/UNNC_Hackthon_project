@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { CalendarFull } from '@/components/calendar-full';
+import { DateTimeWheelPicker } from '@/components/date-time-wheel-picker';
 import { ItemEditor } from '@/components/item-editor';
 import { DEFAULT_TIMEZONE, GROUPS, PRIORITIES } from '@/lib/constants';
 import { COPY } from '@/lib/copy';
@@ -19,7 +20,6 @@ import {
   toDateInputValue,
   toDateTimeInputValue,
 } from '@/lib/time';
-import { DateTimeWheelPicker } from '@/components/date-time-wheel-picker';
 import type {
   ActivityAction,
   ActivityLog,
@@ -29,7 +29,7 @@ import type {
   Priority,
 } from '@/lib/types';
 
-type ConfirmationPanelProps = {
+type ConfirmationModalProps = {
   busy: boolean;
   copy: typeof COPY.en;
   draft: ParseResult | null;
@@ -37,7 +37,8 @@ type ConfirmationPanelProps = {
   mode: 'ai' | 'fallback' | null;
   onChange: (draft: ParseResult) => void;
   onCreate: () => void;
-  onReset: () => void;
+  onDismiss: () => void;
+  open: boolean;
   sourceText: string;
 };
 
@@ -141,7 +142,72 @@ async function fetchWorkspace(
   };
 }
 
-function IntakePanel({
+function GuidePanel({ copy, locale }: { copy: typeof COPY.en; locale: string }) {
+  const isChinese = locale.startsWith('zh');
+  const examples = isChinese
+      ? [
+        {
+          label: '开始时间 + 结束时间 + 地点',
+          text: '周三下午 2 点到 3 点半在 Trent Building 和导师开会',
+        },
+        {
+          label: '开始时间 + 持续时长 + 地点',
+          text: '明天 10:00 在 Portland Building 写 90 分钟 project proposal',
+        },
+        {
+          label: 'To-Do',
+          text: '买打印纸并提交报销',
+        },
+      ]
+    : [
+        {
+          label: 'Start time + end time + location',
+          text: 'Meet my advisor on Wednesday from 2:00 PM to 3:30 PM in Trent Building.',
+        },
+        {
+          label: 'Start time + duration + location',
+          text: 'Start writing the project proposal tomorrow at 10:00 AM in Portland Building for 90 minutes.',
+        },
+        {
+          label: 'To-do',
+          text: 'Buy printer paper and submit the reimbursement form.',
+        },
+      ];
+
+  return (
+    <section className="planner-panel planner-panel--guide">
+      <div className="planner-panel__header">
+        <div>
+          <p className="planner-panel__eyebrow">{copy.sections.intake}</p>
+          <h2 className="planner-panel__title">
+            {isChinese
+              ? '用自然语言描述你想创建的安排'
+              : 'Describe your request in natural language'}
+          </h2>
+        </div>
+      </div>
+
+      <div className="planner-stack planner-stack--compact">
+        <p className="intake-guide__lead">
+          {isChinese
+            ? '直接用一句话说明你想创建的 Event 或 To-Do。AI 会先生成结构化结果，再由你在弹窗里确认或修改。'
+            : 'Use one sentence to describe the event or to-do you want. The app will structure it first, then let you confirm or edit it in a centered review step.'}
+        </p>
+
+        <div className="intake-guide__examples">
+          {examples.map((example) => (
+            <article className="intake-example" key={example.label}>
+              <p className="intake-example__label">{example.label}</p>
+              <p className="intake-example__text">{example.text}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ComposerPanel({
   busy,
   copy,
   locale,
@@ -156,36 +222,23 @@ function IntakePanel({
   setComposerText: (value: string) => void;
   text: string;
 }) {
+  const isChinese = locale.startsWith('zh');
+
   return (
-    <section className="planner-panel planner-panel--intake">
+    <section className="planner-panel planner-panel--composer">
       <div className="planner-panel__header">
         <div>
           <p className="planner-panel__eyebrow">{copy.sections.intake}</p>
-          <h2 className="planner-panel__title">
-            {locale.startsWith('zh') ? '一句话录入你的安排' : 'Describe the plan once'}
-          </h2>
+          <h2 className="planner-panel__title">{isChinese ? '输入你的请求' : 'Write the request'}</h2>
         </div>
       </div>
 
-      <div className="planner-stack">
-        <div className="status-strip">
-          <div>
-            <strong>{locale.startsWith('zh') ? '共享演示工作区' : 'Shared demo workspace'}</strong>
-            <span>
-              {locale.startsWith('zh')
-                ? '无需登录，所有访问者看到同一份事项和历史。'
-                : 'No sign-in. Everyone sees the same shared task and history data.'}
-            </span>
-          </div>
-          <div>
-            <strong>{locale.startsWith('zh') ? '自然语言优先' : 'Natural-language first'}</strong>
-            <span>
-              {locale.startsWith('zh')
-                ? '输入一句话，系统自动判断是日历事件还是普通待办。'
-                : 'Write one sentence and the app decides between calendar event and to-do.'}
-            </span>
-          </div>
-        </div>
+      <div className="planner-stack planner-stack--compact">
+        <p className="composer-panel__hint">
+          {isChinese
+            ? '可以直接写时间范围、开始时间加持续时长，或者一条普通待办。按 Enter 提交，Shift + Enter 换行。'
+            : 'Write a time range, a start time with duration, or a plain to-do. Press Enter to analyze and Shift + Enter for a new line.'}
+        </p>
 
         <textarea
           className="composer-textarea"
@@ -197,15 +250,15 @@ function IntakePanel({
             }
           }}
           placeholder={
-            locale.startsWith('zh')
-              ? '例如：明天下午 3 点和导师开会；或者：记得买打印纸'
-              : 'Try: Meet my advisor tomorrow at 3pm, or Buy printer paper'
+            isChinese
+              ? '例如：明天下午 3 点到 4 点半和导师开会；或者：从晚上 8 点开始健身 45 分钟'
+              : 'Example: Meet my advisor tomorrow from 3:00 PM to 4:30 PM, or Start a 45-minute workout at 8:00 PM tonight'
           }
-          rows={5}
+          rows={4}
           value={text}
         />
 
-        <div className="composer-actions">
+        <div className="composer-actions composer-actions--end">
           <button
             className="planner-button"
             disabled={!text.trim() || busy}
@@ -220,7 +273,7 @@ function IntakePanel({
   );
 }
 
-function ConfirmationPanel({
+function ConfirmationModal({
   busy,
   copy,
   draft,
@@ -228,29 +281,43 @@ function ConfirmationPanel({
   mode,
   onChange,
   onCreate,
-  onReset,
+  onDismiss,
+  open,
   sourceText,
-}: ConfirmationPanelProps) {
-  if (!draft) {
-    return (
-      <section className="planner-panel planner-panel--confirmation">
-        <div className="planner-panel__header">
-          <div>
-            <p className="planner-panel__eyebrow">{copy.sections.confirmation}</p>
-            <h2 className="planner-panel__title">
-              {locale.startsWith('zh') ? '等待 AI 解析结果' : 'Waiting for structured output'}
-            </h2>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  function handleDraftStartConfirm(nextStart: string) {
-    if (!draft) {
+}: ConfirmationModalProps) {
+  useEffect(() => {
+    if (!open) {
       return;
     }
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onDismiss();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onDismiss, open]);
+
+  if (!open || !draft) {
+    return null;
+  }
+
+  function handleDraftStartConfirm(nextStart: string) {
     const nextEnd = ensureEndAfterStartValue(nextStart, draft.end_at);
     onChange({
       ...draft,
@@ -260,10 +327,6 @@ function ConfirmationPanel({
   }
 
   function handleDraftEndConfirm(nextEndInput: string) {
-    if (!draft) {
-      return;
-    }
-
     const nextEnd = ensureEndAfterStartValue(draft.start_at, nextEndInput);
     onChange({
       ...draft,
@@ -272,197 +335,215 @@ function ConfirmationPanel({
   }
 
   return (
-    <section className="planner-panel planner-panel--confirmation">
-      <div className="planner-panel__header">
-        <div>
-          <p className="planner-panel__eyebrow">{copy.sections.confirmation}</p>
-          <h2 className="planner-panel__title">{draft.title}</h2>
-        </div>
-        <div className="planner-badges">
-          <span className="planner-badge">
-            {mode === 'fallback' ? copy.badges.demoFallback : copy.badges.aiSuggested}
-          </span>
-          {draft.needs_confirmation ? (
-            <span className="planner-badge planner-badge--warning">
-              {copy.badges.needsConfirmation}
-            </span>
+    <>
+      <button
+        aria-label="Close confirmation dialog"
+        className="confirmation-modal__overlay"
+        onClick={onDismiss}
+        type="button"
+      />
+      <div
+        aria-labelledby="confirmation-dialog-title"
+        aria-modal="true"
+        className="confirmation-modal"
+        role="dialog"
+      >
+        <section className="planner-panel planner-panel--confirmation planner-panel--confirmation-modal">
+          <div className="planner-panel__header">
+            <div>
+              <p className="planner-panel__eyebrow">{copy.sections.confirmation}</p>
+              <h2 className="planner-panel__title" id="confirmation-dialog-title">
+                {draft.title}
+              </h2>
+            </div>
+            <div className="planner-badges">
+              <span className="planner-badge">
+                {mode === 'fallback' ? copy.badges.demoFallback : copy.badges.aiSuggested}
+              </span>
+              {draft.needs_confirmation ? (
+                <span className="planner-badge planner-badge--warning">
+                  {copy.badges.needsConfirmation}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="editor-grid">
+            <label className="field">
+              <span>{copy.labels.title}</span>
+              <input
+                autoFocus
+                onChange={(event) => onChange({ ...draft, title: event.target.value })}
+                value={draft.title}
+              />
+            </label>
+
+            <label className="field">
+              <span>{copy.labels.type}</span>
+              <select
+                onChange={(event) =>
+                  onChange({ ...draft, type: event.target.value as ItemType })
+                }
+                value={draft.type}
+              >
+                <option value="todo">todo</option>
+                <option value="event">event</option>
+              </select>
+            </label>
+
+            <label className="field">
+              <span>{copy.labels.group}</span>
+              <select
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    group_key: event.target.value as ParseResult['group_key'],
+                  })
+                }
+                value={draft.group_key}
+              >
+                {GROUPS.map((group) => (
+                  <option key={group.key} value={group.key}>
+                    {locale.startsWith('zh') ? group.labelZh : group.labelEn}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>{copy.labels.priority}</span>
+              <select
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    priority: event.target.value as Priority,
+                  })
+                }
+                value={draft.priority}
+              >
+                {PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {priority}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>{copy.labels.estimatedMinutes}</span>
+              <input
+                min={0}
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    estimated_minutes: Number(event.target.value || 0),
+                  })
+                }
+                type="number"
+                value={draft.estimated_minutes ?? 0}
+              />
+            </label>
+
+            <label className="field field--checkbox">
+              <span>{copy.badges.allDay}</span>
+              <input
+                checked={draft.is_all_day}
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    end_at: event.target.checked ? null : draft.end_at,
+                    is_all_day: event.target.checked,
+                    start_at: event.target.checked ? null : draft.start_at,
+                  })
+                }
+                type="checkbox"
+              />
+            </label>
+
+            <label className="field">
+              <span>{copy.labels.dueDate}</span>
+              <input
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    due_date: event.target.value || null,
+                  })
+                }
+                type="date"
+                value={draft.due_date ?? toDateInputValue(draft.start_at)}
+              />
+            </label>
+
+            {!draft.is_all_day ? (
+              <>
+                <div className="field">
+                  <span>{copy.labels.start}</span>
+                  <DateTimeWheelPicker
+                    locale={locale}
+                    onConfirm={handleDraftStartConfirm}
+                    value={draft.start_at}
+                  />
+                </div>
+
+                <div className="field">
+                  <span>{copy.labels.end}</span>
+                  <DateTimeWheelPicker
+                    locale={locale}
+                    minValue={draft.start_at}
+                    onConfirm={handleDraftEndConfirm}
+                    strictAfterMin
+                    value={draft.end_at}
+                  />
+                </div>
+              </>
+            ) : null}
+
+            {!draft.is_all_day && hasInvalidTimedEventRange(draft) ? (
+              <p className="panel-note panel-note--warning field--full">
+                {locale.startsWith('zh')
+                  ? '结束时间必须晚于开始时间。'
+                  : 'End time must be later than start time.'}
+              </p>
+            ) : null}
+
+            <label className="field field--full">
+              <span>{copy.labels.location}</span>
+              <input
+                onChange={(event) => onChange({ ...draft, location: event.target.value })}
+                value={draft.location}
+              />
+            </label>
+
+            <label className="field field--full">
+              <span>{copy.labels.notes}</span>
+              <textarea
+                onChange={(event) => onChange({ ...draft, notes: event.target.value })}
+                rows={4}
+                value={draft.notes}
+              />
+            </label>
+
+            <label className="field field--full">
+              <span>{copy.labels.source}</span>
+              <textarea readOnly rows={3} value={sourceText} />
+            </label>
+          </div>
+
+          {draft.ambiguity_reason ? (
+            <p className="panel-note panel-note--warning">{draft.ambiguity_reason}</p>
           ) : null}
-        </div>
+
+          <div className="editor-actions">
+            <button className="planner-button planner-button--ghost" onClick={onDismiss} type="button">
+              {copy.actions.cancel}
+            </button>
+            <button className="planner-button" disabled={busy} onClick={onCreate} type="button">
+              {copy.actions.create}
+            </button>
+          </div>
+        </section>
       </div>
-
-      <div className="editor-grid">
-        <label className="field">
-          <span>{copy.labels.title}</span>
-          <input
-            onChange={(event) => onChange({ ...draft, title: event.target.value })}
-            value={draft.title}
-          />
-        </label>
-
-        <label className="field">
-          <span>{copy.labels.type}</span>
-          <select
-            onChange={(event) =>
-              onChange({ ...draft, type: event.target.value as ItemType })
-            }
-            value={draft.type}
-          >
-            <option value="todo">todo</option>
-            <option value="event">event</option>
-          </select>
-        </label>
-
-        <label className="field">
-          <span>{copy.labels.group}</span>
-          <select
-            onChange={(event) =>
-              onChange({
-                ...draft,
-                group_key: event.target.value as ParseResult['group_key'],
-              })
-            }
-            value={draft.group_key}
-          >
-            {GROUPS.map((group) => (
-              <option key={group.key} value={group.key}>
-                {locale.startsWith('zh') ? group.labelZh : group.labelEn}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span>{copy.labels.priority}</span>
-          <select
-            onChange={(event) =>
-              onChange({
-                ...draft,
-                priority: event.target.value as Priority,
-              })
-            }
-            value={draft.priority}
-          >
-            {PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {priority}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span>{copy.labels.estimatedMinutes}</span>
-          <input
-            min={0}
-            onChange={(event) =>
-              onChange({
-                ...draft,
-                estimated_minutes: Number(event.target.value || 0),
-              })
-            }
-            type="number"
-            value={draft.estimated_minutes ?? 0}
-          />
-        </label>
-
-        <label className="field field--checkbox">
-          <span>{copy.badges.allDay}</span>
-          <input
-            checked={draft.is_all_day}
-            onChange={(event) =>
-              onChange({
-                ...draft,
-                end_at: event.target.checked ? null : draft.end_at,
-                is_all_day: event.target.checked,
-                start_at: event.target.checked ? null : draft.start_at,
-              })
-            }
-            type="checkbox"
-          />
-        </label>
-
-        <label className="field">
-          <span>{copy.labels.dueDate}</span>
-          <input
-            onChange={(event) =>
-              onChange({
-                ...draft,
-                due_date: event.target.value || null,
-              })
-            }
-            type="date"
-            value={draft.due_date ?? toDateInputValue(draft.start_at)}
-          />
-        </label>
-
-        {!draft.is_all_day ? (
-          <>
-            <div className="field">
-              <span>{copy.labels.start}</span>
-              <DateTimeWheelPicker
-                locale={locale}
-                onConfirm={handleDraftStartConfirm}
-                value={draft.start_at}
-              />
-            </div>
-
-            <div className="field">
-              <span>{copy.labels.end}</span>
-              <DateTimeWheelPicker
-                locale={locale}
-                minValue={draft.start_at}
-                onConfirm={handleDraftEndConfirm}
-                strictAfterMin
-                value={draft.end_at}
-              />
-            </div>
-          </>
-        ) : null}
-
-        {!draft.is_all_day && hasInvalidTimedEventRange(draft) ? (
-          <p className="panel-note panel-note--warning field--full">
-            {locale.startsWith('zh')
-              ? '结束时间必须晚于开始时间。'
-              : 'End time must be later than start time.'}
-          </p>
-        ) : null}
-
-        <label className="field field--full">
-          <span>{copy.labels.location}</span>
-          <input
-            onChange={(event) => onChange({ ...draft, location: event.target.value })}
-            value={draft.location}
-          />
-        </label>
-
-        <label className="field field--full">
-          <span>{copy.labels.notes}</span>
-          <textarea
-            onChange={(event) => onChange({ ...draft, notes: event.target.value })}
-            rows={4}
-            value={draft.notes}
-          />
-        </label>
-
-        <label className="field field--full">
-          <span>{copy.labels.source}</span>
-          <textarea readOnly rows={3} value={sourceText} />
-        </label>
-      </div>
-
-      {draft.ambiguity_reason ? (
-        <p className="panel-note panel-note--warning">{draft.ambiguity_reason}</p>
-      ) : null}
-
-      <div className="editor-actions">
-        <button className="planner-button planner-button--ghost" onClick={onReset} type="button">
-          {copy.actions.cancel}
-        </button>
-        <button className="planner-button" disabled={busy} onClick={onCreate} type="button">
-          {copy.actions.create}
-        </button>
-      </div>
-    </section>
+    </>
   );
 }
 
@@ -769,6 +850,7 @@ export function PlannerApp() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [composerText, setComposerText] = useState('');
   const [draft, setDraft] = useState<ParseResult | null>(null);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [parseMode, setParseMode] = useState<'ai' | 'fallback' | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -816,6 +898,12 @@ export function PlannerApp() {
     });
   }, [loadWorkspace, supabase]);
 
+  const closeConfirmation = useCallback(() => {
+    setDraft(null);
+    setParseMode(null);
+    setIsConfirmationOpen(false);
+  }, []);
+
   async function jsonRequest(path: string, init?: RequestInit) {
     const response = await fetch(path, {
       ...init,
@@ -854,6 +942,7 @@ export function PlannerApp() {
 
       setDraft(payload.result as ParseResult);
       setParseMode(payload.mode as 'ai' | 'fallback');
+      setIsConfirmationOpen(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to analyze request.');
     } finally {
@@ -897,6 +986,7 @@ export function PlannerApp() {
 
       setComposerText('');
       setDraft(null);
+      setIsConfirmationOpen(false);
       setParseMode(null);
       setMessage(locale.startsWith('zh') ? '事项已创建。' : 'Item created.');
 
@@ -1116,7 +1206,8 @@ export function PlannerApp() {
       {message ? <div className="planner-toast">{message}</div> : null}
 
       <section className="planner-grid planner-grid--top">
-        <IntakePanel
+        <GuidePanel copy={copy} locale={locale} />
+        <ComposerPanel
           busy={busy}
           copy={copy}
           locale={locale}
@@ -1124,21 +1215,20 @@ export function PlannerApp() {
           setComposerText={setComposerText}
           text={composerText}
         />
-        <ConfirmationPanel
-          busy={busy}
-          copy={copy}
-          draft={draft}
-          locale={locale}
-          mode={parseMode}
-          onChange={setDraft}
-          onCreate={() => void handleCreate()}
-          onReset={() => {
-            setDraft(null);
-            setParseMode(null);
-          }}
-          sourceText={composerText}
-        />
       </section>
+
+      <ConfirmationModal
+        busy={busy}
+        copy={copy}
+        draft={draft}
+        locale={locale}
+        mode={parseMode}
+        onChange={setDraft}
+        onCreate={() => void handleCreate()}
+        onDismiss={closeConfirmation}
+        open={isConfirmationOpen}
+        sourceText={composerText}
+      />
 
       <section className="planner-grid planner-grid--bottom planner-grid--triple">
         <CalendarFull
