@@ -53,7 +53,7 @@ export type UpdateItemPayload = Partial<CreateItemPayload> & {
   status?: string;
 };
 
-export type ActivityAction = 'created' | 'updated' | 'completed' | 'deleted';
+export type ActivityAction = 'created' | 'updated' | 'completed' | 'deleted' | 'undo';
 
 export type LocaleCopy = {
   actions: {

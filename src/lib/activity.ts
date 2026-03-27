@@ -1,5 +1,5 @@
 import type { Json } from '@/lib/database.types';
-import type { ActivityAction, Item } from '@/lib/types';
+import type { ActivityAction, ActivityLog, Item } from '@/lib/types';
 
 function formatValue(value: unknown) {
   if (value === null || value === undefined || value === '') {
@@ -137,5 +137,35 @@ export function buildUpdatedLog(previous: Item, next: Item) {
       : changes.length > 0
         ? `Updated "${next.title}": ${changes.join('; ')}.`
         : `Updated "${next.title}".`,
+  };
+}
+
+export function buildUndoLog(params: {
+  afterItem: Item | null;
+  beforeItem: Item | null;
+  reversedUndo?: boolean;
+  targetLog: ActivityLog;
+}) {
+  const { afterItem, beforeItem, reversedUndo = false, targetLog } = params;
+  const title =
+    targetLog.item_title || afterItem?.title || beforeItem?.title || 'Untitled item';
+
+  return {
+    action: 'updated' as ActivityAction,
+    details_json: {
+      item_after: afterItem,
+      item_before: beforeItem,
+      undo_meta: {
+        reversed_undo: reversedUndo,
+        target_action: targetLog.action,
+        target_log_id: targetLog.id,
+      },
+    } satisfies Json,
+    item_id: targetLog.item_id,
+    item_title: title,
+    item_type: targetLog.item_type,
+    summary: reversedUndo
+      ? `Reverted undo for "${title}".`
+      : `Undid ${targetLog.action} for "${title}".`,
   };
 }

@@ -424,8 +424,8 @@ button:disabled {
   z-index: 2;
 }
 
-.wheel-picker__triple > [data-rwp],
-.wheel-picker__double > [data-rwp] {
+.wheel-picker__triple>[data-rwp],
+.wheel-picker__double>[data-rwp] {
   position: relative;
   overflow: hidden;
   flex: 1;
@@ -438,19 +438,19 @@ button:disabled {
   mask-image: linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
 }
 
-.wheel-picker__triple > [data-rwp]:first-child {
+.wheel-picker__triple>[data-rwp]:first-child {
   flex: 1.35;
 }
 
-.wheel-picker__triple > [data-rwp] + [data-rwp],
-.wheel-picker__double > [data-rwp] + [data-rwp] {
+.wheel-picker__triple>[data-rwp]+[data-rwp],
+.wheel-picker__double>[data-rwp]+[data-rwp] {
   border-left: 1px solid rgba(156, 174, 208, 0.24);
 }
 
-.wheel-picker__triple > [data-rwp]:focus,
-.wheel-picker__double > [data-rwp]:focus,
-.wheel-picker__triple > [data-rwp]:focus-visible,
-.wheel-picker__double > [data-rwp]:focus-visible {
+.wheel-picker__triple>[data-rwp]:focus,
+.wheel-picker__double>[data-rwp]:focus,
+.wheel-picker__triple>[data-rwp]:focus-visible,
+.wheel-picker__double>[data-rwp]:focus-visible {
   outline: none;
 }
 
@@ -802,11 +802,9 @@ button:disabled {
   border-radius: 10px;
   padding: 3px 8px;
   color: #17304f;
-  background: linear-gradient(
-    135deg,
-    var(--planner-calendar-month-start) 0%,
-    var(--planner-calendar-month-end) 100%
-  );
+  background: linear-gradient(135deg,
+      var(--planner-calendar-month-start) 0%,
+      var(--planner-calendar-month-end) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
   overflow: hidden;
 }
@@ -849,11 +847,9 @@ button:disabled {
   border-radius: 8px;
   padding: 6px 8px;
   color: #17304f;
-  background: linear-gradient(
-    140deg,
-    var(--planner-calendar-week-start) 0%,
-    var(--planner-calendar-week-end) 100%
-  );
+  background: linear-gradient(140deg,
+      var(--planner-calendar-week-start) 0%,
+      var(--planner-calendar-week-end) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
@@ -936,8 +932,7 @@ button:disabled {
   min-height: 100%;
 }
 
-.planner-fullcalendar .fc .planner-fullcalendar__event.fc-timegrid-event.fc-timegrid-event-short
-  .planner-calendar-week-event__frame {
+.planner-fullcalendar .fc .planner-fullcalendar__event.fc-timegrid-event.fc-timegrid-event-short .planner-calendar-week-event__frame {
   padding-top: 4px;
   padding-bottom: 4px;
 }
@@ -978,6 +973,53 @@ button:disabled {
   overflow: auto;
   padding-right: 6px;
   content-visibility: auto;
+}
+
+.history-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history-toolbar__toggle {
+  min-width: 92px;
+}
+
+.history-bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.history-bulk-actions p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.history-bulk-actions__buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-bulk-actions__buttons button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  font: inherit;
+}
+
+.history-bulk-actions__buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .todo-card {
@@ -1038,6 +1080,31 @@ button:disabled {
   background: rgba(255, 255, 255, 0.75);
 }
 
+.history-card--selected {
+  border-color: rgba(79, 124, 255, 0.58);
+  background: rgba(79, 124, 255, 0.08);
+}
+
+.history-card__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.history-card__check span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .history-card h3 {
   margin: 10px 0 8px;
   font-size: 1rem;
@@ -1088,6 +1155,11 @@ button:disabled {
 .history-card__badge--deleted {
   color: #8a3b21;
   background: rgba(221, 105, 72, 0.12);
+}
+
+.history-card__badge--undo {
+  color: #5e3e93;
+  background: rgba(123, 110, 246, 0.16);
 }
 
 .landing-shell,

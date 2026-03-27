@@ -58,9 +58,12 @@ type TodoRailProps = {
 };
 
 type HistoryTimelineProps = {
+  busy: boolean;
   copy: typeof COPY.en;
   locale: string;
   logs: ActivityLog[];
+  onDeleteLogs: (logIds: string[]) => Promise<void>;
+  onUndoLogs: (logIds: string[]) => Promise<void>;
 };
 
 function resolveLocale() {
@@ -561,6 +564,9 @@ function TodoRail({
 }
 
 function actionTone(action: ActivityAction) {
+  if (action === 'undo') {
+    return 'history-card__badge--undo';
+  }
   if (action === 'completed') {
     return 'history-card__badge--completed';
   }
@@ -573,7 +579,46 @@ function actionTone(action: ActivityAction) {
   return 'history-card__badge--created';
 }
 
-function HistoryTimeline({ copy, locale, logs }: HistoryTimelineProps) {
+function isUndoLog(log: ActivityLog) {
+  const details = log.details_json;
+  if (!details || typeof details !== 'object' || Array.isArray(details)) {
+    return false;
+  }
+
+  const undoMeta = (details as Record<string, unknown>).undo_meta;
+  return Boolean(undoMeta && typeof undoMeta === 'object' && !Array.isArray(undoMeta));
+}
+
+function HistoryTimeline({
+  busy,
+  copy,
+  locale,
+  logs,
+  onDeleteLogs,
+  onUndoLogs,
+}: HistoryTimelineProps) {
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedIds((current) => current.filter((id) => logs.some((log) => log.id === id)));
+  }, [logs]);
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds([]);
+  }
+
+  function toggleSelect(logId: string) {
+    setSelectedIds((current) =>
+      current.includes(logId)
+        ? current.filter((id) => id !== logId)
+        : [...current, logId]
+    );
+  }
+
+  const allSelected = logs.length > 0 && selectedIds.length === logs.length;
+
   return (
     <section className="planner-panel planner-panel--history">
       <div className="planner-panel__header">
@@ -583,7 +628,78 @@ function HistoryTimeline({ copy, locale, logs }: HistoryTimelineProps) {
             {locale.startsWith('zh') ? '最近的操作轨迹' : 'Recent activity'}
           </h2>
         </div>
+        <div className="history-toolbar">
+          <button
+            className="planner-button planner-button--ghost history-toolbar__toggle"
+            disabled={busy || logs.length === 0}
+            onClick={() => {
+              if (selectMode) {
+                exitSelectMode();
+              } else {
+                setSelectMode(true);
+              }
+            }}
+            type="button"
+          >
+            {selectMode
+              ? locale.startsWith('zh')
+                ? '退出选择'
+                : 'Exit select'
+              : locale.startsWith('zh')
+                ? '选择'
+                : 'Select'}
+          </button>
+        </div>
       </div>
+
+      {selectMode ? (
+        <div className="history-bulk-actions">
+          <p>
+            {locale.startsWith('zh')
+              ? `已选择 ${selectedIds.length} 条日志`
+              : `${selectedIds.length} selected`}
+          </p>
+          <div className="history-bulk-actions__buttons">
+            <button
+              disabled={busy || logs.length === 0}
+              onClick={() =>
+                setSelectedIds(allSelected ? [] : logs.map((log) => log.id))
+              }
+              type="button"
+            >
+              {allSelected
+                ? locale.startsWith('zh')
+                  ? '取消全选'
+                  : 'Clear all'
+                : locale.startsWith('zh')
+                  ? '全选'
+                  : 'Select all'}
+            </button>
+            <button
+              disabled={busy || selectedIds.length === 0}
+              onClick={() =>
+                void onUndoLogs(selectedIds).then(() => {
+                  exitSelectMode();
+                })
+              }
+              type="button"
+            >
+              {locale.startsWith('zh') ? '撤销' : 'Undo'}
+            </button>
+            <button
+              disabled={busy || selectedIds.length === 0}
+              onClick={() =>
+                void onDeleteLogs(selectedIds).then(() => {
+                  exitSelectMode();
+                })
+              }
+              type="button"
+            >
+              {locale.startsWith('zh') ? '删除' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="history-list">
         {logs.length === 0 ? (
@@ -592,10 +708,28 @@ function HistoryTimeline({ copy, locale, logs }: HistoryTimelineProps) {
           </p>
         ) : null}
         {logs.map((log) => (
-          <article className="history-card" key={log.id}>
+          <article
+            className={`history-card ${selectedIds.includes(log.id) ? 'history-card--selected' : ''}`}
+            key={log.id}
+          >
+            {selectMode ? (
+              <label className="history-card__check">
+                <input
+                  checked={selectedIds.includes(log.id)}
+                  disabled={busy}
+                  onChange={() => toggleSelect(log.id)}
+                  type="checkbox"
+                />
+                <span>{locale.startsWith('zh') ? '选择该日志' : 'Select log'}</span>
+              </label>
+            ) : null}
             <div className="history-card__meta">
-              <span className={`history-card__badge ${actionTone(log.action as ActivityAction)}`}>
-                {log.action}
+              <span
+                className={`history-card__badge ${actionTone(
+                  (isUndoLog(log) ? 'undo' : log.action) as ActivityAction
+                )}`}
+              >
+                {isUndoLog(log) ? 'undo' : log.action}
               </span>
               <time>{formatDateTimeLabel(log.created_at, locale, DEFAULT_TIMEZONE)}</time>
             </div>
@@ -644,6 +778,7 @@ export function PlannerApp() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [groupFilter, setGroupFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [historyBusy, setHistoryBusy] = useState(false);
 
   const deferredSearch = useDeferredValue(search);
   const copy = resolveCopy(locale);
@@ -849,6 +984,66 @@ export function PlannerApp() {
     }
   }
 
+  async function handleUndoLogs(logIds: string[]) {
+    if (logIds.length === 0) {
+      return;
+    }
+
+    setHistoryBusy(true);
+    setMessage(null);
+
+    try {
+      const payload = await jsonRequest('/api/history', {
+        body: JSON.stringify({ logIds }),
+        method: 'PATCH',
+      });
+
+      const failedCount = Array.isArray(payload.failed) ? payload.failed.length : 0;
+      if (failedCount > 0) {
+        setMessage(
+          locale.startsWith('zh')
+            ? `已撤销部分日志，失败 ${failedCount} 条。`
+            : `Partially undone. ${failedCount} log(s) failed.`
+        );
+      } else {
+        setMessage(locale.startsWith('zh') ? '日志已撤销。' : 'History undone.');
+      }
+
+      startTransition(() => {
+        void loadWorkspace();
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Failed to undo history logs.');
+    } finally {
+      setHistoryBusy(false);
+    }
+  }
+
+  async function handleDeleteLogs(logIds: string[]) {
+    if (logIds.length === 0) {
+      return;
+    }
+
+    setHistoryBusy(true);
+    setMessage(null);
+
+    try {
+      await jsonRequest('/api/history', {
+        body: JSON.stringify({ logIds }),
+        method: 'DELETE',
+      });
+
+      setMessage(locale.startsWith('zh') ? '日志已删除。' : 'History deleted.');
+      startTransition(() => {
+        void loadWorkspace();
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Failed to delete history logs.');
+    } finally {
+      setHistoryBusy(false);
+    }
+  }
+
   const activeItems = items.filter(
     (item) => item.status !== 'completed' && item.status !== 'cancelled'
   );
@@ -969,7 +1164,14 @@ export function PlannerApp() {
           setStatusFilter={setStatusFilter}
           statusFilter={statusFilter}
         />
-        <HistoryTimeline copy={copy} locale={locale} logs={logs} />
+        <HistoryTimeline
+          busy={busy || historyBusy}
+          copy={copy}
+          locale={locale}
+          logs={logs}
+          onDeleteLogs={handleDeleteLogs}
+          onUndoLogs={handleUndoLogs}
+        />
       </section>
 
       <ItemEditor
