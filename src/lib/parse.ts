@@ -18,6 +18,7 @@ type PartialParseResult = Partial<ParseResult> & {
   estimated_minutes?: unknown;
   group_key?: unknown;
   is_all_day?: unknown;
+  location?: unknown;
   needs_confirmation?: unknown;
   notes?: unknown;
   priority?: unknown;
@@ -81,6 +82,32 @@ function titleFromText(text: string) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 120);
+}
+
+function locationFromMatch(value: string | undefined) {
+  if (!value) {
+    return '';
+  }
+
+  return value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^(the\s+)/i, '')
+    .slice(0, 120);
+}
+
+function inferLocation(text: string) {
+  const chineseMatch = text.match(/在([^，。；;\n]+?)(?:见面|集合|会合|开会|上课|讨论|吃饭|就诊|锻炼|汇报|碰头|$)/);
+  if (chineseMatch) {
+    return locationFromMatch(chineseMatch[1]);
+  }
+
+  const englishMatch = text.match(/\b(?:at|in)\s+([^,.;\n]+?)(?:\s+(?:for|with|to)\b|$)/i);
+  if (englishMatch) {
+    return locationFromMatch(englishMatch[1]);
+  }
+
+  return '';
 }
 
 function inferGroup(text: string): GroupKey {
@@ -252,6 +279,7 @@ export function fallbackParseInput(text: string, timezone = DEFAULT_TIMEZONE): P
     estimated_minutes: estimatedMinutes,
     group_key: inferGroup(text),
     is_all_day: hasDate && !hasTime,
+    location: inferLocation(text),
     needs_confirmation: needsConfirmation,
     notes: '',
     priority: inferPriority(text),
@@ -311,6 +339,8 @@ function normalizeParseResult(payload: PartialParseResult | null, text: string) 
     estimated_minutes: estimatedMinutes,
     group_key: sanitizeGroup(payload?.group_key),
     is_all_day: isAllDay,
+    location:
+      typeof payload?.location === 'string' ? payload.location.trim() : fallback.location,
     needs_confirmation:
       typeof payload?.needs_confirmation === 'boolean'
         ? payload.needs_confirmation
@@ -371,17 +401,18 @@ export async function parseInputWithAi(input: {
             content: `
 You are a bilingual AI planning assistant.
 Return only a JSON object with these keys:
-type, title, notes, group_key, priority, estimated_minutes, start_at, end_at, due_date, is_all_day, needs_confirmation, ambiguity_reason, confidence.
+type, title, location, notes, group_key, priority, estimated_minutes, start_at, end_at, due_date, is_all_day, needs_confirmation, ambiguity_reason, confidence.
 
 Rules:
 - group_key must be one of: study, work, life, health, other.
 - priority must be one of: low, medium, high.
 - type must be event or todo.
+- location should contain only the place name when the user clearly provides one. Otherwise use an empty string.
 - Use ISO 8601 for start_at/end_at. Use YYYY-MM-DD for due_date.
 - If the user gives a date but no time, create an all-day event with due_date set and start_at/end_at null.
 - If the text is ambiguous like "next week", set needs_confirmation true and explain ambiguity_reason.
 - If an event has a start time but no end time, estimate estimated_minutes and derive a reasonable end_at.
-- Keep title concise. notes can be empty.
+- Keep title concise. location and notes can be empty.
 - Respect locale ${locale} and timezone ${timezone}.
 - Current timestamp is ${now}.
             `.trim(),

@@ -23,6 +23,7 @@ export type ParseResult = {
   estimated_minutes: number | null;
   group_key: GroupKey;
   is_all_day: boolean;
+  location: string;
   needs_confirmation: boolean;
   notes: string;
   priority: Priority;
@@ -37,6 +38,7 @@ export type CreateItemPayload = {
   estimated_minutes: number | null;
   group_key: GroupKey;
   is_all_day: boolean;
+  location: string | null;
   notes: string;
   parse_confidence: number | null;
   priority: Priority;
@@ -73,6 +75,7 @@ export type LocaleCopy = {
     end: string;
     estimatedMinutes: string;
     group: string;
+    location: string;
     notes: string;
     priority: string;
     source: string;

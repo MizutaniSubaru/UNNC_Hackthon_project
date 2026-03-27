@@ -89,6 +89,36 @@ export function formatDateTimeLabel(
   }).format(date);
 }
 
+type EventTimeRangeInput = {
+  end?: DateLike;
+  isAllDay?: boolean;
+  locale: string;
+  start: DateLike;
+  timezone: string;
+};
+
+export function formatEventTimeRange({
+  end,
+  isAllDay = false,
+  locale,
+  start,
+  timezone,
+}: EventTimeRangeInput) {
+  if (isAllDay) {
+    return locale.startsWith('zh') ? '\u5168\u5929' : 'All day';
+  }
+
+  const startLabel = formatTimeLabel(start, locale, timezone);
+  const endDate = toDate(end);
+
+  if (!endDate) {
+    return startLabel;
+  }
+
+  const endLabel = formatTimeLabel(endDate, locale, timezone);
+  return startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
+}
+
 export function getMonthGrid(reference: Date) {
   const first = new Date(reference.getFullYear(), reference.getMonth(), 1);
   const start = new Date(first);

@@ -70,6 +70,7 @@ export function normalizeCreatePayload(payload: Partial<CreateItemPayload>) {
     estimated_minutes: estimatedMinutes,
     group_key: asGroupKey(payload.group_key),
     is_all_day: isAllDay,
+    location: asNullableString(payload.location),
     needs_confirmation: false,
     notes: asNullableString(payload.notes),
     parse_confidence:
@@ -119,6 +120,8 @@ export function normalizeUpdatePayload(
         ? asGroupKey(payload.group_key)
         : (currentItem.group_key as GroupKey),
     is_all_day: isAllDay,
+    location:
+      payload.location !== undefined ? asNullableString(payload.location) : currentItem.location,
     notes: payload.notes !== undefined ? asNullableString(payload.notes) : currentItem.notes,
     parse_confidence:
       typeof payload.parse_confidence === 'number' && Number.isFinite(payload.parse_confidence)

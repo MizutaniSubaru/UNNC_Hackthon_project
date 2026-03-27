@@ -25,6 +25,7 @@ create table public.items (
   id uuid primary key default gen_random_uuid(),
   type text not null check (type in ('todo', 'event')),
   title text not null,
+  location text,
   notes text,
   status text not null,
   group_key text not null default 'other' references public.groups(key),

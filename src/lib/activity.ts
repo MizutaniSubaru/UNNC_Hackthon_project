@@ -30,6 +30,10 @@ function summarizeDiff(previous: Item, next: Item) {
     changes.push(`date: ${formatValue(previous.due_date)} -> ${formatValue(next.due_date)}`);
   }
 
+  if (previous.location !== next.location) {
+    changes.push(`location: ${formatValue(previous.location)} -> ${formatValue(next.location)}`);
+  }
+
   if (previous.group_key !== next.group_key) {
     changes.push(`group: ${previous.group_key} -> ${next.group_key}`);
   }
@@ -61,6 +65,7 @@ export function buildCreatedLog(item: Item) {
         estimated_minutes: item.estimated_minutes,
         group_key: item.group_key,
         is_all_day: item.is_all_day,
+        location: item.location,
         priority: item.priority,
         start_at: item.start_at,
         status: item.status,
@@ -81,6 +86,7 @@ export function buildDeletedLog(item: Item) {
         due_date: item.due_date,
         end_at: item.end_at,
         group_key: item.group_key,
+        location: item.location,
         priority: item.priority,
         start_at: item.start_at,
         status: item.status,
@@ -107,6 +113,7 @@ export function buildUpdatedLog(previous: Item, next: Item) {
         end_at: next.end_at,
         estimated_minutes: next.estimated_minutes,
         group_key: next.group_key,
+        location: next.location,
         priority: next.priority,
         start_at: next.start_at,
         status: next.status,
@@ -116,6 +123,7 @@ export function buildUpdatedLog(previous: Item, next: Item) {
         end_at: previous.end_at,
         estimated_minutes: previous.estimated_minutes,
         group_key: previous.group_key,
+        location: previous.location,
         priority: previous.priority,
         start_at: previous.start_at,
         status: previous.status,

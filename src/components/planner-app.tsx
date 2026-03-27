@@ -365,6 +365,14 @@ function ConfirmationPanel({
         ) : null}
 
         <label className="field field--full">
+          <span>{copy.labels.location}</span>
+          <input
+            onChange={(event) => onChange({ ...draft, location: event.target.value })}
+            value={draft.location}
+          />
+        </label>
+
+        <label className="field field--full">
           <span>{copy.labels.notes}</span>
           <textarea
             onChange={(event) => onChange({ ...draft, notes: event.target.value })}
@@ -677,6 +685,7 @@ export function PlannerApp() {
             ? draft.due_date ?? toDateInputValue(draft.start_at)
             : draft.due_date,
           end_at: draft.is_all_day ? null : toIsoOrNull(draft.end_at),
+          location: draft.location,
           parse_confidence: draft.confidence,
           source_text: composerText,
           start_at: draft.is_all_day ? null : toIsoOrNull(draft.start_at),
@@ -712,6 +721,7 @@ export function PlannerApp() {
           estimated_minutes: item.estimated_minutes,
           group_key: item.group_key,
           is_all_day: item.is_all_day,
+          location: item.location,
           notes: item.notes,
           parse_confidence: item.parse_confidence,
           priority: item.priority,
@@ -765,7 +775,7 @@ export function PlannerApp() {
 
   const filteredTodos = sortItems(
     items.filter((item) => {
-      const haystack = `${item.title} ${item.notes ?? ''}`.toLowerCase();
+      const haystack = `${item.title} ${item.location ?? ''} ${item.notes ?? ''}`.toLowerCase();
 
       if (deferredSearch.trim() && !haystack.includes(deferredSearch.toLowerCase())) {
         return false;
@@ -854,6 +864,7 @@ export function PlannerApp() {
           locale={locale}
           onFocusDateChange={setFocusDate}
           onSelectItem={setSelectedItem}
+          timezone={timezone}
         />
         <TodoRail
           copy={copy}

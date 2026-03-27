@@ -158,6 +158,14 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
         ) : null}
 
         <label className="field field--full">
+          <span>{copy.labels.location}</span>
+          <input
+            onChange={(event) => onChange({ ...item, location: event.target.value })}
+            value={item.location ?? ''}
+          />
+        </label>
+
+        <label className="field field--full">
           <span>{copy.labels.notes}</span>
           <textarea
             onChange={(event) => onChange({ ...item, notes: event.target.value })}

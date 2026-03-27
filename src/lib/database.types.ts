@@ -75,6 +75,7 @@ export type Database = {
           group_key: string;
           id: string;
           is_all_day: boolean;
+          location: string | null;
           needs_confirmation: boolean;
           notes: string | null;
           parse_confidence: number | null;
@@ -94,6 +95,7 @@ export type Database = {
           group_key?: string;
           id?: string;
           is_all_day?: boolean;
+          location?: string | null;
           needs_confirmation?: boolean;
           notes?: string | null;
           parse_confidence?: number | null;
@@ -113,6 +115,7 @@ export type Database = {
           group_key?: string;
           id?: string;
           is_all_day?: boolean;
+          location?: string | null;
           needs_confirmation?: boolean;
           notes?: string | null;
           parse_confidence?: number | null;
