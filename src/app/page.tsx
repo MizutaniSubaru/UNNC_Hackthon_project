@@ -1,86 +1,123 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
+import type { Database } from '@/lib/database.types';
+import { getSupabaseClient } from '@/lib/supabase';
+
+type Expense = Database['public']['Tables']['expenses']['Row'];
 
 export default function Home() {
   const [text, setText] = useState('');
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isSupabaseConfigured] = useState(() => Boolean(getSupabaseClient()));
 
-  // 1. 获取已有的账单列表
   const fetchExpenses = async () => {
-    const { data } = await supabase.from('expenses').select('*').order('created_at', { ascending: false });
-    if (data) setExpenses(data);
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      setExpenses([]);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('expenses')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setExpenses(data as Expense[]);
+    }
   };
 
   useEffect(() => {
-    fetchExpenses();
+    void fetchExpenses();
   }, []);
 
-  // 2. 提交 AI 解析并保存
   const handleSubmit = async () => {
-    if (!text) return;
+    if (!text) {
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      alert('Please configure Supabase first.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 第一步：调用后端 API 进行 AI 分析
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
+
       const aiData = await res.json();
 
-      // 第二步：使用 Supabase SDK 将结果直接存入数据库
-      const { error } = await supabase.from('expenses').insert([{
-        amount: aiData.amount,
-        category: aiData.category,
-        description: aiData.description || text,
-      }]);
+      const { error } = await supabase.from('expenses').insert([
+        {
+          amount: aiData.amount,
+          category: aiData.category,
+          description: aiData.description || text,
+        },
+      ]);
 
-      if (error) alert('Error saving to Supabase: ' + error.message);
-      
-      // 第三步：清空输入框并刷新列表
+      if (error) {
+        alert(`Error saving to Supabase: ${error.message}`);
+        return;
+      }
+
       setText('');
-      fetchExpenses();
-    } catch (err) {
-      console.error(err);
+      await fetchExpenses();
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="max-w-2xl mx-auto p-8 font-sans">
-      <h1 className="text-3xl font-bold mb-8">AI 记账助手 💰</h1>
-      
-      <div className="flex gap-2 mb-8">
-        <input 
-          className="flex-1 p-2 border rounded text-black" 
-          placeholder="说一句话记账，例如：刚才喝奶茶花了 15 元"
+    <main className="mx-auto max-w-2xl p-8 font-sans">
+      <h1 className="mb-8 text-3xl font-bold">AI Expense Assistant</h1>
+
+      <div className="mb-8 flex gap-2">
+        <input
+          className="flex-1 rounded border p-2 text-black"
+          placeholder="Describe an expense, for example: Milk tea 15 RMB"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          onKeyDown={(e) => e.key === 'Enter' && void handleSubmit()}
         />
-        <button 
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-          onClick={handleSubmit}
-          disabled={loading}
+        <button
+          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+          onClick={() => void handleSubmit()}
+          disabled={loading || !isSupabaseConfigured}
         >
-          {loading ? 'AI 分析中...' : '一键记账'}
+          {loading ? 'Analyzing...' : 'Save Expense'}
         </button>
       </div>
 
+      {!isSupabaseConfigured && (
+        <p className="mb-8 rounded border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
+          Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+          before using the database features.
+        </p>
+      )}
+
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">历史记录</h2>
+        <h2 className="text-xl font-semibold">History</h2>
         {expenses.map((item) => (
-          <div key={item.id} className="p-4 border rounded flex justify-between items-center bg-gray-50 text-black">
+          <div
+            key={item.id}
+            className="flex items-center justify-between rounded border bg-gray-50 p-4 text-black"
+          >
             <div>
               <p className="font-bold">{item.description}</p>
               <p className="text-sm text-gray-500">{item.category}</p>
             </div>
-            <p className="text-xl font-mono text-red-600">-{item.amount} 元</p>
+            <p className="font-mono text-xl text-red-600">-{item.amount} RMB</p>
           </div>
         ))}
       </div>
