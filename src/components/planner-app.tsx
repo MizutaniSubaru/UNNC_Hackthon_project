@@ -394,16 +394,16 @@ function ConfirmationPanel({
 
         {!draft.is_all_day ? (
           <>
-            <label className="field">
+            <div className="field">
               <span>{copy.labels.start}</span>
               <DateTimeWheelPicker
                 locale={locale}
                 onConfirm={handleDraftStartConfirm}
                 value={draft.start_at}
               />
-            </label>
+            </div>
 
-            <label className="field">
+            <div className="field">
               <span>{copy.labels.end}</span>
               <DateTimeWheelPicker
                 locale={locale}
@@ -412,7 +412,7 @@ function ConfirmationPanel({
                 strictAfterMin
                 value={draft.end_at}
               />
-            </label>
+            </div>
           </>
         ) : null}
 

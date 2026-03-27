@@ -1,307 +1,416 @@
 'use client';
 
+import {
+  WheelPicker,
+  WheelPickerWrapper,
+  type WheelPickerOption,
+} from '@ncdai/react-wheel-picker';
 import { useEffect, useMemo, useState } from 'react';
 
 type DateTimeWheelPickerProps = {
-    locale: string;
-    minValue?: string | null;
-    onConfirm: (value: string) => void;
-    strictAfterMin?: boolean;
-    value: string | null;
-    yearEnd?: number;
-    yearStart?: number;
+  locale: string;
+  minValue?: string | null;
+  onConfirm: (value: string) => void;
+  strictAfterMin?: boolean;
+  value: string | null;
+  yearEnd?: number;
+  yearStart?: number;
 };
 
+const WHEEL_ITEM_HEIGHT = 36;
+const WHEEL_VISIBLE_COUNT = 20;
+
 function pad(value: number) {
-    return String(value).padStart(2, '0');
+  return String(value).padStart(2, '0');
 }
 
 function isLeapYear(year: number) {
-    return year % 400 === 0 || (year % 4 === 0 && year % 100 !== 0);
+  return year % 400 === 0 || (year % 4 === 0 && year % 100 !== 0);
 }
 
 function getDaysInMonth(year: number, month: number) {
-    const monthToDays = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    return monthToDays[month - 1] ?? 31;
+  const monthToDays = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return monthToDays[month - 1] ?? 31;
 }
 
 function parseDateTime(value: string | null, yearStart: number, yearEnd: number) {
-    const fallback = new Date();
-    const parsed = value ? new Date(value) : fallback;
-    const base = Number.isNaN(parsed.getTime()) ? fallback : parsed;
+  const fallback = new Date();
+  const parsed = value ? new Date(value) : fallback;
+  const base = Number.isNaN(parsed.getTime()) ? fallback : parsed;
 
-    const year = Math.min(yearEnd, Math.max(yearStart, base.getFullYear()));
-    const month = base.getMonth() + 1;
-    const day = base.getDate();
-    const hour = base.getHours();
-    const minute = base.getMinutes();
+  const year = Math.min(yearEnd, Math.max(yearStart, base.getFullYear()));
+  const month = base.getMonth() + 1;
+  const day = base.getDate();
+  const hour = base.getHours();
+  const minute = base.getMinutes();
 
-    return { day, hour, minute, month, year };
+  return { day, hour, minute, month, year };
 }
 
 function toLocalDateTimeValue(year: number, month: number, day: number, hour: number, minute: number) {
-    return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
+  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
 }
 
 function toTimestamp(value: string | null | undefined) {
-    if (!value) {
-        return null;
-    }
+  if (!value) {
+    return null;
+  }
 
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
 
-    return date.getTime();
+  return date.getTime();
+}
+
+function buildNumberOptions(
+  values: number[],
+  formatter: (value: number) => string = String
+): WheelPickerOption<number>[] {
+  return values.map((entry) => {
+    const label = formatter(entry);
+
+    return {
+      label,
+      textValue: label,
+      value: entry,
+    };
+  });
 }
 
 export function DateTimeWheelPicker({
-    locale,
-    minValue,
-    onConfirm,
-    strictAfterMin = false,
-    value,
-    yearEnd = 3000,
-    yearStart = 2000,
+  locale,
+  minValue,
+  onConfirm,
+  strictAfterMin = false,
+  value,
+  yearEnd = 3000,
+  yearStart = 2000,
 }: DateTimeWheelPickerProps) {
-    const parsed = useMemo(() => parseDateTime(value, yearStart, yearEnd), [value, yearEnd, yearStart]);
+  const parsed = useMemo(() => parseDateTime(value, yearStart, yearEnd), [value, yearEnd, yearStart]);
+  const isChinese = locale.startsWith('zh');
+  const copy = isChinese
+    ? {
+        cancel: '\u53d6\u6d88',
+        confirm: '\u786e\u8ba4',
+        date: '\u65e5\u671f',
+        day: '\u65e5',
+        hour: '\u65f6',
+        invalidRange: '\u65f6\u95f4\u5fc5\u987b\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4\u3002',
+        minute: '\u5206',
+        month: '\u6708',
+        pickDate: '\u9009\u62e9\u65e5\u671f',
+        pickTime: '\u9009\u62e9\u65f6\u95f4',
+        time: '\u65f6\u95f4',
+        year: '\u5e74',
+      }
+    : {
+        cancel: 'Cancel',
+        confirm: 'Confirm',
+        date: 'Date',
+        day: 'Day',
+        hour: 'Hour',
+        invalidRange: 'Time must be later than start time.',
+        minute: 'Minute',
+        month: 'Month',
+        pickDate: 'Pick Date',
+        pickTime: 'Pick Time',
+        time: 'Time',
+        year: 'Year',
+      };
 
-    const [openPanel, setOpenPanel] = useState<'date' | 'time' | null>(null);
-    const [feedback, setFeedback] = useState<string | null>(null);
+  const [openPanel, setOpenPanel] = useState<'date' | 'time' | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-    const [committedYear, setCommittedYear] = useState(parsed.year);
-    const [committedMonth, setCommittedMonth] = useState(parsed.month);
-    const [committedDay, setCommittedDay] = useState(parsed.day);
-    const [committedHour, setCommittedHour] = useState(parsed.hour);
-    const [committedMinute, setCommittedMinute] = useState(parsed.minute);
+  const [committedYear, setCommittedYear] = useState(parsed.year);
+  const [committedMonth, setCommittedMonth] = useState(parsed.month);
+  const [committedDay, setCommittedDay] = useState(parsed.day);
+  const [committedHour, setCommittedHour] = useState(parsed.hour);
+  const [committedMinute, setCommittedMinute] = useState(parsed.minute);
 
-    const [draftYear, setDraftYear] = useState(parsed.year);
-    const [draftMonth, setDraftMonth] = useState(parsed.month);
-    const [draftDay, setDraftDay] = useState(parsed.day);
-    const [draftHour, setDraftHour] = useState(parsed.hour);
-    const [draftMinute, setDraftMinute] = useState(parsed.minute);
+  const [draftYear, setDraftYear] = useState(parsed.year);
+  const [draftMonth, setDraftMonth] = useState(parsed.month);
+  const [draftDay, setDraftDay] = useState(parsed.day);
+  const [draftHour, setDraftHour] = useState(parsed.hour);
+  const [draftMinute, setDraftMinute] = useState(parsed.minute);
 
-    useEffect(() => {
-        setCommittedYear(parsed.year);
-        setCommittedMonth(parsed.month);
-        setCommittedDay(parsed.day);
-        setCommittedHour(parsed.hour);
-        setCommittedMinute(parsed.minute);
+  useEffect(() => {
+    setCommittedYear(parsed.year);
+    setCommittedMonth(parsed.month);
+    setCommittedDay(parsed.day);
+    setCommittedHour(parsed.hour);
+    setCommittedMinute(parsed.minute);
 
-        setDraftYear(parsed.year);
-        setDraftMonth(parsed.month);
-        setDraftDay(parsed.day);
-        setDraftHour(parsed.hour);
-        setDraftMinute(parsed.minute);
-    }, [parsed]);
+    setDraftYear(parsed.year);
+    setDraftMonth(parsed.month);
+    setDraftDay(parsed.day);
+    setDraftHour(parsed.hour);
+    setDraftMinute(parsed.minute);
+  }, [parsed]);
 
-    const draftDaysInMonth = useMemo(
-        () => getDaysInMonth(draftYear, draftMonth),
-        [draftMonth, draftYear]
+  const draftDaysInMonth = useMemo(() => getDaysInMonth(draftYear, draftMonth), [draftMonth, draftYear]);
+  const safeDraftDay = Math.min(draftDay, draftDaysInMonth);
+
+  useEffect(() => {
+    if (draftDay !== safeDraftDay) {
+      setDraftDay(safeDraftDay);
+    }
+  }, [draftDay, safeDraftDay]);
+
+  const yearOptions = useMemo(
+    () => buildNumberOptions(Array.from({ length: yearEnd - yearStart + 1 }, (_, index) => yearStart + index)),
+    [yearEnd, yearStart]
+  );
+  const monthOptions = useMemo(
+    () => buildNumberOptions(Array.from({ length: 12 }, (_, index) => index + 1), pad),
+    []
+  );
+  const dayOptions = useMemo(
+    () => buildNumberOptions(Array.from({ length: draftDaysInMonth }, (_, index) => index + 1), pad),
+    [draftDaysInMonth]
+  );
+  const hourOptions = useMemo(
+    () => buildNumberOptions(Array.from({ length: 24 }, (_, index) => index), pad),
+    []
+  );
+  const minuteOptions = useMemo(
+    () => buildNumberOptions(Array.from({ length: 60 }, (_, index) => index), pad),
+    []
+  );
+
+  const committedDateValue = toLocalDateTimeValue(
+    committedYear,
+    committedMonth,
+    committedDay,
+    committedHour,
+    committedMinute
+  );
+  const minTimestamp = toTimestamp(minValue);
+
+  function isBlocked(candidateValue: string) {
+    const candidate = toTimestamp(candidateValue);
+    if (candidate === null || minTimestamp === null) {
+      return false;
+    }
+
+    return strictAfterMin ? candidate <= minTimestamp : candidate < minTimestamp;
+  }
+
+  function dismissPanel() {
+    setFeedback(null);
+    setOpenPanel(null);
+  }
+
+  function openDatePanel() {
+    setDraftYear(committedYear);
+    setDraftMonth(committedMonth);
+    setDraftDay(committedDay);
+    setFeedback(null);
+    setOpenPanel('date');
+  }
+
+  function openTimePanel() {
+    setDraftHour(committedHour);
+    setDraftMinute(committedMinute);
+    setFeedback(null);
+    setOpenPanel('time');
+  }
+
+  function cancelDateSelection() {
+    setDraftYear(committedYear);
+    setDraftMonth(committedMonth);
+    setDraftDay(committedDay);
+    dismissPanel();
+  }
+
+  function cancelTimeSelection() {
+    setDraftHour(committedHour);
+    setDraftMinute(committedMinute);
+    dismissPanel();
+  }
+
+  function confirmDateSelection() {
+    const nextValue = toLocalDateTimeValue(
+      draftYear,
+      draftMonth,
+      safeDraftDay,
+      committedHour,
+      committedMinute
     );
 
-    useEffect(() => {
-        if (draftDay > draftDaysInMonth) {
-            setDraftDay(draftDaysInMonth);
-        }
-    }, [draftDay, draftDaysInMonth]);
+    if (isBlocked(nextValue)) {
+      setFeedback(copy.invalidRange);
+      return;
+    }
 
-    const yearOptions = useMemo(
-        () => Array.from({ length: yearEnd - yearStart + 1 }, (_, index) => yearStart + index),
-        [yearEnd, yearStart]
+    setCommittedYear(draftYear);
+    setCommittedMonth(draftMonth);
+    setCommittedDay(safeDraftDay);
+    setFeedback(null);
+    onConfirm(nextValue);
+    setOpenPanel(null);
+  }
+
+  function confirmTimeSelection() {
+    const nextValue = toLocalDateTimeValue(
+      committedYear,
+      committedMonth,
+      committedDay,
+      draftHour,
+      draftMinute
     );
-    const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, index) => index + 1), []);
-    const dayOptions = useMemo(
-        () => Array.from({ length: draftDaysInMonth }, (_, index) => index + 1),
-        [draftDaysInMonth]
-    );
-    const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, index) => index), []);
-    const minuteOptions = useMemo(() => Array.from({ length: 60 }, (_, index) => index), []);
 
-    const committedDateValue = toLocalDateTimeValue(
-        committedYear,
-        committedMonth,
-        committedDay,
-        committedHour,
-        committedMinute
-    );
-    const minTimestamp = toTimestamp(minValue);
-
-    const isChinese = locale.startsWith('zh');
-
-    function isBlocked(candidateValue: string) {
-        const candidate = toTimestamp(candidateValue);
-        if (candidate === null || minTimestamp === null) {
-            return false;
-        }
-
-        return strictAfterMin ? candidate <= minTimestamp : candidate < minTimestamp;
+    if (isBlocked(nextValue)) {
+      setFeedback(copy.invalidRange);
+      return;
     }
 
-    function openDatePanel() {
-        setDraftYear(committedYear);
-        setDraftMonth(committedMonth);
-        setDraftDay(committedDay);
-        setFeedback(null);
-        setOpenPanel('date');
-    }
+    setCommittedHour(draftHour);
+    setCommittedMinute(draftMinute);
+    setFeedback(null);
+    onConfirm(nextValue);
+    setOpenPanel(null);
+  }
 
-    function openTimePanel() {
-        setDraftHour(committedHour);
-        setDraftMinute(committedMinute);
-        setFeedback(null);
-        setOpenPanel('time');
-    }
+  const wheelClassNames = {
+    highlightItem: 'wheel-picker__highlight-item',
+    highlightWrapper: 'wheel-picker__highlight',
+    optionItem: 'wheel-picker__option',
+  } as const;
 
-    function cancelDateSelection() {
-        setDraftYear(committedYear);
-        setDraftMonth(committedMonth);
-        setDraftDay(committedDay);
-        setFeedback(null);
-        setOpenPanel(null);
-    }
+  return (
+    <div className="wheel-picker">
+      <div className="wheel-picker__triggers">
+        <button className="wheel-picker__trigger" onClick={openDatePanel} type="button">
+          {copy.pickDate} · {`${committedYear}-${pad(committedMonth)}-${pad(committedDay)}`}
+        </button>
+        <button className="wheel-picker__trigger" onClick={openTimePanel} type="button">
+          {copy.pickTime} · {`${pad(committedHour)}:${pad(committedMinute)}`}
+        </button>
+      </div>
 
-    function cancelTimeSelection() {
-        setDraftHour(committedHour);
-        setDraftMinute(committedMinute);
-        setFeedback(null);
-        setOpenPanel(null);
-    }
+      {openPanel ? (
+        <button
+          aria-label="Close picker"
+          className="wheel-picker__overlay"
+          onClick={dismissPanel}
+          type="button"
+        />
+      ) : null}
 
-    function confirmDateSelection() {
-        const nextValue = toLocalDateTimeValue(
-            draftYear,
-            draftMonth,
-            draftDay,
-            committedHour,
-            committedMinute
-        );
-
-        if (isBlocked(nextValue)) {
-            setFeedback(
-                isChinese ? '时间必须晚于开始时间。' : 'Time must be later than start time.'
-            );
-            return;
-        }
-
-        setCommittedYear(draftYear);
-        setCommittedMonth(draftMonth);
-        setCommittedDay(draftDay);
-        setFeedback(null);
-        setOpenPanel(null);
-        onConfirm(nextValue);
-    }
-
-    function confirmTimeSelection() {
-        const nextValue = toLocalDateTimeValue(
-            committedYear,
-            committedMonth,
-            committedDay,
-            draftHour,
-            draftMinute
-        );
-
-        if (isBlocked(nextValue)) {
-            setFeedback(
-                isChinese ? '时间必须晚于开始时间。' : 'Time must be later than start time.'
-            );
-            return;
-        }
-
-        setCommittedHour(draftHour);
-        setCommittedMinute(draftMinute);
-        setFeedback(null);
-        setOpenPanel(null);
-        onConfirm(nextValue);
-    }
-
-    return (
-        <div className="wheel-picker">
-            <div className="wheel-picker__triggers">
-                <button className="wheel-picker__trigger" onClick={openDatePanel} type="button">
-                    {isChinese ? '选择日期' : 'Pick Date'} · {`${committedYear}-${pad(committedMonth)}-${pad(committedDay)}`}
-                </button>
-                <button className="wheel-picker__trigger" onClick={openTimePanel} type="button">
-                    {isChinese ? '选择时间' : 'Pick Time'} · {`${pad(committedHour)}:${pad(committedMinute)}`}
-                </button>
+      {openPanel === 'date' ? (
+        <div className="wheel-picker__popover" role="dialog" aria-modal="true">
+          <div className="wheel-picker__panel">
+            <div className="wheel-picker__title">{copy.date}</div>
+            <div className="wheel-picker__header wheel-picker__header--date">
+              <span>{copy.year}</span>
+              <span>{copy.month}</span>
+              <span>{copy.day}</span>
             </div>
-
-            {openPanel ? <button className="wheel-picker__overlay" onClick={() => setOpenPanel(null)} type="button" /> : null}
-
-            {openPanel === 'date' ? (
-                <div className="wheel-picker__popover" role="dialog" aria-modal="true">
-                    <div className="wheel-picker__panel">
-                        <div className="wheel-picker__title">Date</div>
-                        <div className="wheel-picker__header wheel-picker__header--date">
-                            <span>Year</span>
-                            <span>Month</span>
-                            <span>Day</span>
-                        </div>
-                        <div className="wheel-picker__triple">
-                            <select className="wheel-picker__select" onChange={(event) => setDraftYear(Number(event.target.value))} size={3} value={String(draftYear)}>
-                                {yearOptions.map((entry) => (
-                                    <option key={entry} value={entry}>{entry}</option>
-                                ))}
-                            </select>
-                            <select className="wheel-picker__select" onChange={(event) => setDraftMonth(Number(event.target.value))} size={3} value={String(draftMonth)}>
-                                {monthOptions.map((entry) => (
-                                    <option key={entry} value={entry}>{entry}</option>
-                                ))}
-                            </select>
-                            <select className="wheel-picker__select" onChange={(event) => setDraftDay(Number(event.target.value))} size={3} value={String(draftDay)}>
-                                {dayOptions.map((entry) => (
-                                    <option key={entry} value={entry}>{entry}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="wheel-picker__actions">
-                            <button className="wheel-picker__button wheel-picker__button--cancel" onClick={cancelDateSelection} type="button">
-                                {isChinese ? '取消' : 'Cancel'}
-                            </button>
-                            <button className="wheel-picker__button wheel-picker__button--confirm" onClick={confirmDateSelection} type="button">
-                                {isChinese ? '确认' : 'Confirm'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-
-            {openPanel === 'time' ? (
-                <div className="wheel-picker__popover" role="dialog" aria-modal="true">
-                    <div className="wheel-picker__panel">
-                        <div className="wheel-picker__title">Time</div>
-                        <div className="wheel-picker__double">
-                            <select className="wheel-picker__select" onChange={(event) => setDraftHour(Number(event.target.value))} size={3} value={String(draftHour)}>
-                                {hourOptions.map((entry) => (
-                                    <option key={entry} value={entry}>{pad(entry)}</option>
-                                ))}
-                            </select>
-                            <select className="wheel-picker__select" onChange={(event) => setDraftMinute(Number(event.target.value))} size={3} value={String(draftMinute)}>
-                                {minuteOptions.map((entry) => (
-                                    <option key={entry} value={entry}>{pad(entry)}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="wheel-picker__actions">
-                            <button className="wheel-picker__button wheel-picker__button--cancel" onClick={cancelTimeSelection} type="button">
-                                {isChinese ? '取消' : 'Cancel'}
-                            </button>
-                            <button className="wheel-picker__button wheel-picker__button--confirm" onClick={confirmTimeSelection} type="button">
-                                {isChinese ? '确认' : 'Confirm'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-
-            {feedback ? (
-                <div className="wheel-picker__feedback">
-                    <span className="wheel-picker__hint">{feedback}</span>
-                </div>
-            ) : null}
-
-            <input type="hidden" value={committedDateValue} readOnly />
+            <WheelPickerWrapper className="wheel-picker__triple">
+              <WheelPicker
+                classNames={wheelClassNames}
+                onValueChange={setDraftYear}
+                optionItemHeight={WHEEL_ITEM_HEIGHT}
+                options={yearOptions}
+                value={draftYear}
+                visibleCount={WHEEL_VISIBLE_COUNT}
+              />
+              <WheelPicker
+                classNames={wheelClassNames}
+                infinite
+                onValueChange={setDraftMonth}
+                optionItemHeight={WHEEL_ITEM_HEIGHT}
+                options={monthOptions}
+                value={draftMonth}
+                visibleCount={WHEEL_VISIBLE_COUNT}
+              />
+              <WheelPicker
+                classNames={wheelClassNames}
+                infinite
+                onValueChange={setDraftDay}
+                optionItemHeight={WHEEL_ITEM_HEIGHT}
+                options={dayOptions}
+                value={safeDraftDay}
+                visibleCount={WHEEL_VISIBLE_COUNT}
+              />
+            </WheelPickerWrapper>
+            <div className="wheel-picker__actions">
+              <button
+                className="wheel-picker__button wheel-picker__button--cancel"
+                onClick={cancelDateSelection}
+                type="button"
+              >
+                {copy.cancel}
+              </button>
+              <button
+                className="wheel-picker__button wheel-picker__button--confirm"
+                onClick={confirmDateSelection}
+                type="button"
+              >
+                {copy.confirm}
+              </button>
+            </div>
+          </div>
         </div>
-    );
+      ) : null}
+
+      {openPanel === 'time' ? (
+        <div className="wheel-picker__popover" role="dialog" aria-modal="true">
+          <div className="wheel-picker__panel">
+            <div className="wheel-picker__title">{copy.time}</div>
+            <div className="wheel-picker__header wheel-picker__header--time">
+              <span>{copy.hour}</span>
+              <span>{copy.minute}</span>
+            </div>
+            <WheelPickerWrapper className="wheel-picker__double">
+              <WheelPicker
+                classNames={wheelClassNames}
+                infinite
+                onValueChange={setDraftHour}
+                optionItemHeight={WHEEL_ITEM_HEIGHT}
+                options={hourOptions}
+                value={draftHour}
+                visibleCount={WHEEL_VISIBLE_COUNT}
+              />
+              <WheelPicker
+                classNames={wheelClassNames}
+                infinite
+                onValueChange={setDraftMinute}
+                optionItemHeight={WHEEL_ITEM_HEIGHT}
+                options={minuteOptions}
+                value={draftMinute}
+                visibleCount={WHEEL_VISIBLE_COUNT}
+              />
+            </WheelPickerWrapper>
+            <div className="wheel-picker__actions">
+              <button
+                className="wheel-picker__button wheel-picker__button--cancel"
+                onClick={cancelTimeSelection}
+                type="button"
+              >
+                {copy.cancel}
+              </button>
+              <button
+                className="wheel-picker__button wheel-picker__button--confirm"
+                onClick={confirmTimeSelection}
+                type="button"
+              >
+                {copy.confirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {feedback ? (
+        <div className="wheel-picker__feedback">
+          <span className="wheel-picker__hint">{feedback}</span>
+        </div>
+      ) : null}
+
+      <input type="hidden" value={committedDateValue} readOnly />
+    </div>
+  );
 }

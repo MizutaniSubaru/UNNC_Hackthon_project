@@ -185,16 +185,16 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
 
         {!item.is_all_day ? (
           <>
-            <label className="field">
+            <div className="field">
               <span>{copy.labels.start}</span>
               <DateTimeWheelPicker
                 locale={locale}
                 onConfirm={handleStartConfirm}
                 value={item.start_at}
               />
-            </label>
+            </div>
 
-            <label className="field">
+            <div className="field">
               <span>{copy.labels.end}</span>
               <DateTimeWheelPicker
                 locale={locale}
@@ -203,7 +203,7 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
                 strictAfterMin
                 value={item.end_at}
               />
-            </label>
+            </div>
           </>
         ) : null}
 
