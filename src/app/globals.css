@@ -607,8 +607,25 @@ button:disabled {
   letter-spacing: 0.08em;
 }
 
-.planner-fullcalendar .fc .fc-day-today {
-  background: linear-gradient(180deg, rgba(221, 105, 72, 0.09), rgba(255, 255, 255, 0.82));
+.planner-fullcalendar .fc .fc-daygrid-day.fc-day-today,
+.planner-fullcalendar .fc .fc-timegrid-col.fc-day-today,
+.planner-fullcalendar .fc .fc-col-header-cell.fc-day-today {
+  background: linear-gradient(180deg, rgba(255, 244, 196, 0.62), rgba(255, 250, 224, 0.88));
+}
+
+.planner-fullcalendar .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number,
+.planner-fullcalendar .fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  background: linear-gradient(180deg, #f04747 0%, #d83434 100%);
+  box-shadow: 0 3px 10px rgba(216, 52, 52, 0.28);
 }
 
 .planner-fullcalendar .fc .fc-daygrid-event,
