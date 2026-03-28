@@ -8,6 +8,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 
 type DateTimeWheelPickerProps = {
+  dateOnly?: boolean;
   locale: string;
   minValue?: string | null;
   onConfirm: (value: string) => void;
@@ -80,6 +81,7 @@ function buildNumberOptions(
 }
 
 export function DateTimeWheelPicker({
+  dateOnly = false,
   locale,
   minValue,
   onConfirm,
@@ -148,6 +150,12 @@ export function DateTimeWheelPicker({
     setDraftHour(parsed.hour);
     setDraftMinute(parsed.minute);
   }, [parsed]);
+
+  useEffect(() => {
+    if (dateOnly && openPanel === 'time') {
+      setOpenPanel(null);
+    }
+  }, [dateOnly, openPanel]);
 
   const draftDaysInMonth = useMemo(() => getDaysInMonth(draftYear, draftMonth), [draftMonth, draftYear]);
   const safeDraftDay = Math.min(draftDay, draftDaysInMonth);
@@ -285,9 +293,11 @@ export function DateTimeWheelPicker({
         <button className="wheel-picker__trigger" onClick={openDatePanel} type="button">
           {copy.pickDate} · {`${committedYear}-${pad(committedMonth)}-${pad(committedDay)}`}
         </button>
-        <button className="wheel-picker__trigger" onClick={openTimePanel} type="button">
-          {copy.pickTime} · {`${pad(committedHour)}:${pad(committedMinute)}`}
-        </button>
+        {dateOnly ? null : (
+          <button className="wheel-picker__trigger" onClick={openTimePanel} type="button">
+            {copy.pickTime} · {`${pad(committedHour)}:${pad(committedMinute)}`}
+          </button>
+        )}
       </div>
 
       {openPanel ? (
@@ -356,7 +366,7 @@ export function DateTimeWheelPicker({
         </div>
       ) : null}
 
-      {openPanel === 'time' ? (
+      {openPanel === 'time' && !dateOnly ? (
         <div className="wheel-picker__popover" role="dialog" aria-modal="true">
           <div className="wheel-picker__panel">
             <div className="wheel-picker__title">{copy.time}</div>

@@ -8,27 +8,23 @@ import {
   useState,
 } from 'react';
 import { CalendarFull } from '@/components/calendar-full';
-import { DateTimeWheelPicker } from '@/components/date-time-wheel-picker';
 import { ItemEditor } from '@/components/item-editor';
+import { PlannerEditorFields } from '@/components/planner-editor-fields';
 import { DEFAULT_TIMEZONE, GROUPS, PRIORITIES } from '@/lib/constants';
 import { COPY } from '@/lib/copy';
+import {
+  hasInvalidTimedEventRange,
+  sanitizeTimingForSubmission,
+} from '@/lib/editor-timing';
 import { createLaunchOrigin } from '@/lib/launch-origin';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
-import {
-  formatDateTimeLabel,
-  isEndAfterStart,
-  sortItems,
-  toDateInputValue,
-  toDateTimeInputValue,
-} from '@/lib/time';
+import { formatDateTimeLabel, sortItems } from '@/lib/time';
 import type {
   ActivityAction,
   ActivityLog,
   Item,
-  ItemType,
   LaunchOrigin,
   ParseResult,
-  Priority,
   SearchHit,
   SearchMode,
   SearchResponse,
@@ -110,33 +106,6 @@ function toIsoOrNull(value: string | null | undefined) {
 
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function ensureEndAfterStartValue(startAt: string | null, endAt: string | null) {
-  if (!startAt || !endAt || isEndAfterStart(startAt, endAt)) {
-    return endAt;
-  }
-
-  const start = new Date(startAt);
-  if (Number.isNaN(start.getTime())) {
-    return endAt;
-  }
-
-  start.setMinutes(start.getMinutes() + 30);
-  return toDateTimeInputValue(start);
-}
-
-function hasInvalidTimedEventRange(input: {
-  end_at: string | null;
-  is_all_day: boolean;
-  start_at: string | null;
-  type: string;
-}) {
-  if (input.type !== 'event' || input.is_all_day || !input.start_at || !input.end_at) {
-    return false;
-  }
-
-  return !isEndAfterStart(input.start_at, input.end_at);
 }
 
 async function fetchWorkspace(
@@ -339,23 +308,6 @@ function ConfirmationModal({
 
   const activeDraft = draft;
 
-  function handleDraftStartConfirm(nextStart: string) {
-    const nextEnd = ensureEndAfterStartValue(nextStart, activeDraft.end_at);
-    onChange({
-      ...activeDraft,
-      end_at: nextEnd,
-      start_at: nextStart,
-    });
-  }
-
-  function handleDraftEndConfirm(nextEndInput: string) {
-    const nextEnd = ensureEndAfterStartValue(activeDraft.start_at, nextEndInput);
-    onChange({
-      ...activeDraft,
-      end_at: nextEnd,
-    });
-  }
-
   return (
     <>
       <button
@@ -390,167 +342,19 @@ function ConfirmationModal({
             </div>
           </div>
 
-          <div className="editor-grid">
-            <label className="field">
-              <span>{copy.labels.title}</span>
-              <input
-                autoFocus
-                onChange={(event) => onChange({ ...activeDraft, title: event.target.value })}
-                value={activeDraft.title}
-              />
-            </label>
+          <PlannerEditorFields
+            autoFocusTitle
+            copy={copy}
+            locale={locale}
+            onChange={onChange}
+            sourceMode="readonly"
+            sourceValue={sourceText}
+            value={activeDraft}
+          />
+          {/*
 
-            <label className="field">
-              <span>{copy.labels.type}</span>
-              <select
-                onChange={(event) =>
-                  onChange({ ...activeDraft, type: event.target.value as ItemType })
-                }
-                value={activeDraft.type}
-              >
-                <option value="todo">todo</option>
-                <option value="event">event</option>
-              </select>
-            </label>
-
-            <label className="field">
-              <span>{copy.labels.group}</span>
-              <select
-                onChange={(event) =>
-                  onChange({
-                    ...activeDraft,
-                    group_key: event.target.value as ParseResult['group_key'],
-                  })
-                }
-                value={activeDraft.group_key}
-              >
-                {GROUPS.map((group) => (
-                  <option key={group.key} value={group.key}>
-                    {locale.startsWith('zh') ? group.labelZh : group.labelEn}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>{copy.labels.priority}</span>
-              <select
-                onChange={(event) =>
-                  onChange({
-                    ...activeDraft,
-                    priority: event.target.value as Priority,
-                  })
-                }
-                value={activeDraft.priority}
-              >
-                {PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {priority}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>{copy.labels.estimatedMinutes}</span>
-              <input
-                min={0}
-                onChange={(event) =>
-                  onChange({
-                    ...activeDraft,
-                    estimated_minutes: Number(event.target.value || 0),
-                  })
-                }
-                type="number"
-                value={activeDraft.estimated_minutes ?? 0}
-              />
-            </label>
-
-            <label className="field field--checkbox">
-              <span>{copy.badges.allDay}</span>
-              <input
-                checked={activeDraft.is_all_day}
-                onChange={(event) =>
-                  onChange({
-                    ...activeDraft,
-                    end_at: event.target.checked ? null : activeDraft.end_at,
-                    is_all_day: event.target.checked,
-                    start_at: event.target.checked ? null : activeDraft.start_at,
-                  })
-                }
-                type="checkbox"
-              />
-            </label>
-
-            <label className="field">
-              <span>{copy.labels.dueDate}</span>
-              <input
-                onChange={(event) =>
-                  onChange({
-                    ...activeDraft,
-                    due_date: event.target.value || null,
-                  })
-                }
-                type="date"
-                value={activeDraft.due_date ?? toDateInputValue(activeDraft.start_at)}
-              />
-            </label>
-
-            {!activeDraft.is_all_day ? (
-              <>
-                <div className="field">
-                  <span>{copy.labels.start}</span>
-                  <DateTimeWheelPicker
-                    locale={locale}
-                    onConfirm={handleDraftStartConfirm}
-                    value={activeDraft.start_at}
-                  />
-                </div>
-
-                <div className="field">
-                  <span>{copy.labels.end}</span>
-                  <DateTimeWheelPicker
-                    locale={locale}
-                    minValue={activeDraft.start_at}
-                    onConfirm={handleDraftEndConfirm}
-                    strictAfterMin
-                    value={activeDraft.end_at}
-                  />
-                </div>
-              </>
-            ) : null}
-
-            {!activeDraft.is_all_day && hasInvalidTimedEventRange(activeDraft) ? (
-              <p className="panel-note panel-note--warning field--full">
-                {locale.startsWith('zh')
                   ? '结束时间必须晚于开始时间。'
-                  : 'End time must be later than start time.'}
-              </p>
-            ) : null}
-
-            <label className="field field--full">
-              <span>{copy.labels.location}</span>
-              <input
-                onChange={(event) => onChange({ ...activeDraft, location: event.target.value })}
-                value={activeDraft.location}
-              />
-            </label>
-
-            <label className="field field--full">
-              <span>{copy.labels.notes}</span>
-              <textarea
-                onChange={(event) => onChange({ ...activeDraft, notes: event.target.value })}
-                rows={4}
-                value={activeDraft.notes}
-              />
-            </label>
-
-            <label className="field field--full">
-              <span>{copy.labels.source}</span>
-              <textarea readOnly rows={3} value={sourceText} />
-            </label>
-          </div>
-
+          */}
           {activeDraft.ambiguity_reason ? (
             <p className="panel-note panel-note--warning">{activeDraft.ambiguity_reason}</p>
           ) : null}
@@ -1134,18 +938,18 @@ export function PlannerApp() {
     setMessage(null);
 
     try {
+      const draftPayload = sanitizeTimingForSubmission(draft);
+
       await jsonRequest('/api/items', {
         body: JSON.stringify({
-          ...draft,
-          due_date: draft.is_all_day
-            ? draft.due_date ?? toDateInputValue(draft.start_at)
-            : draft.due_date,
-          end_at: draft.is_all_day ? null : toIsoOrNull(draft.end_at),
-          location: draft.location,
-          parse_confidence: draft.confidence,
+          ...draftPayload,
+          due_date: draftPayload.due_date,
+          end_at: draftPayload.end_at ? toIsoOrNull(draftPayload.end_at) : null,
+          location: draftPayload.location,
+          parse_confidence: draftPayload.confidence,
           source_text: composerText,
-          start_at: draft.is_all_day ? null : toIsoOrNull(draft.start_at),
-          status: draft.type === 'event' ? 'scheduled' : 'pending',
+          start_at: draftPayload.start_at ? toIsoOrNull(draftPayload.start_at) : null,
+          status: draftPayload.type === 'event' ? 'scheduled' : 'pending',
         }),
         method: 'POST',
       });
@@ -1180,22 +984,24 @@ export function PlannerApp() {
     setMessage(null);
 
     try {
+      const nextItem = sanitizeTimingForSubmission(item);
+
       await jsonRequest(`/api/items/${item.id}`, {
         body: JSON.stringify({
-          due_date: item.due_date,
-          end_at: item.is_all_day ? null : toIsoOrNull(item.end_at),
-          estimated_minutes: item.estimated_minutes,
-          group_key: item.group_key,
-          is_all_day: item.is_all_day,
-          location: item.location,
-          notes: item.notes,
-          parse_confidence: item.parse_confidence,
-          priority: item.priority,
-          source_text: item.source_text,
-          start_at: item.is_all_day ? null : toIsoOrNull(item.start_at),
-          status: item.status,
-          title: item.title,
-          type: item.type,
+          due_date: nextItem.due_date,
+          end_at: nextItem.end_at ? toIsoOrNull(nextItem.end_at) : null,
+          estimated_minutes: nextItem.estimated_minutes,
+          group_key: nextItem.group_key,
+          is_all_day: nextItem.is_all_day,
+          location: nextItem.location,
+          notes: nextItem.notes,
+          parse_confidence: nextItem.parse_confidence,
+          priority: nextItem.priority,
+          source_text: nextItem.source_text,
+          start_at: nextItem.start_at ? toIsoOrNull(nextItem.start_at) : null,
+          status: nextItem.status,
+          title: nextItem.title,
+          type: nextItem.type,
         }),
         method: 'PATCH',
       });
