@@ -131,6 +131,19 @@ export type LocaleCopy = {
     resetFilters: string;
     save: string;
   };
+  pomodoro: {
+    autoStart: string;
+    breakMinutes: string;
+    cycles: string;
+    focusMinutes: string;
+    paused: string;
+    pauseTimer: string;
+    resumeTimer: string;
+    settings: string;
+    sound: string;
+    startTimer: string;
+    tomatoLabel: string;
+  };
   badges: {
     aiSuggested: string;
     allDay: string;

@@ -169,6 +169,13 @@ function toIsoOrNull(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function formatCountdown(totalSeconds: number) {
+  const safeSeconds = Math.max(totalSeconds, 0);
+  const minutes = String(Math.floor(safeSeconds / 60)).padStart(2, '0');
+  const seconds = String(safeSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
 async function fetchWorkspace(
   supabase: NonNullable<ReturnType<typeof getSupabaseClient>>
 ) {
@@ -1107,9 +1114,36 @@ export function PlannerApp() {
   const [searchRangeLabel, setSearchRangeLabel] = useState<string | null>(null);
   const [searchFallback, setSearchFallback] = useState(false);
   const [schedulePanelHeight, setSchedulePanelHeight] = useState<number | null>(null);
+  const [showPomodoroMenu, setShowPomodoroMenu] = useState(false);
+  const [focusMinutes, setFocusMinutes] = useState(25);
+  const [breakMinutes, setBreakMinutes] = useState(5);
+  const [pomodoroCycles, setPomodoroCycles] = useState(4);
+  const [autoStartNext, setAutoStartNext] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
+  const [isPomodoroPaused, setIsPomodoroPaused] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const bottomGridRef = useRef<HTMLElement | null>(null);
+  const pomodoroMenuRef = useRef<HTMLDivElement | null>(null);
 
   const copy = resolveCopy(locale);
+
+  const closePomodoroMenu = useCallback(() => {
+    setShowPomodoroMenu(false);
+  }, []);
+
+  const startPomodoroTimer = useCallback(() => {
+    const initialSeconds = Math.max(focusMinutes, 1) * 60;
+    setRemainingSeconds(initialSeconds);
+    setIsPomodoroPaused(false);
+    setIsPomodoroRunning(true);
+  }, [focusMinutes]);
+
+  const exitPomodoroProcess = useCallback(() => {
+    setIsPomodoroRunning(false);
+    setIsPomodoroPaused(false);
+    setRemainingSeconds(0);
+  }, []);
 
   useEffect(() => {
     setLocale(resolveLocale());
@@ -1180,6 +1214,93 @@ export function PlannerApp() {
       observer.disconnect();
     };
   }, [configured]);
+
+  useEffect(() => {
+    if (!showPomodoroMenu) {
+      return;
+    }
+
+    function handleOutsidePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (pomodoroMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      closePomodoroMenu();
+    }
+
+    function handleEscapeKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closePomodoroMenu();
+      }
+    }
+
+    window.addEventListener('pointerdown', handleOutsidePointerDown);
+    window.addEventListener('keydown', handleEscapeKey);
+
+    return () => {
+      window.removeEventListener('pointerdown', handleOutsidePointerDown);
+      window.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [closePomodoroMenu, showPomodoroMenu]);
+
+  useEffect(() => {
+    if (!isPomodoroRunning || isPomodoroPaused || typeof window === 'undefined') {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setRemainingSeconds((current) => {
+        if (current <= 1) {
+          setIsPomodoroRunning(false);
+          setIsPomodoroPaused(false);
+
+          if (soundEnabled) {
+            const AudioContextClass = window.AudioContext || (window as typeof window & {
+              webkitAudioContext?: typeof AudioContext;
+            }).webkitAudioContext;
+
+            if (AudioContextClass) {
+              try {
+                const context = new AudioContextClass();
+                const oscillator = context.createOscillator();
+                const gain = context.createGain();
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, context.currentTime);
+                gain.gain.setValueAtTime(0.0001, context.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.03);
+                gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.35);
+
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+
+                oscillator.start();
+                oscillator.stop(context.currentTime + 0.35);
+                window.setTimeout(() => {
+                  void context.close();
+                }, 420);
+              } catch {
+                // Ignore audio API errors silently.
+              }
+            }
+          }
+
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [isPomodoroPaused, isPomodoroRunning, soundEnabled]);
 
   const closeConfirmation = useCallback(() => {
     setParsedDrafts([]);
@@ -1300,6 +1421,7 @@ export function PlannerApp() {
     } finally {
       setBusy(false);
     }
+
   }
 
   async function handleCreateCurrent() {
@@ -1636,11 +1758,164 @@ export function PlannerApp() {
       <div className="planner-shell__halo planner-shell__halo--one" />
       <div className="planner-shell__halo planner-shell__halo--two" />
 
-      <section className="planner-hero">
+      <section className={`planner-hero ${showPomodoroMenu ? 'planner-hero--menu-open' : ''}`}>
         <div>
           <h1 className="planner-hero__title">Orbit Planner</h1>
         </div>
         <div className="planner-hero__controls">
+          <div className="planner-hero__menu" ref={pomodoroMenuRef}>
+            <MotionButton
+              aria-expanded={showPomodoroMenu}
+              aria-haspopup="menu"
+              aria-label={copy.pomodoro.tomatoLabel}
+              className="planner-button planner-button--ghost planner-button--icon"
+              motionPreset="subtle"
+              onClick={() => setShowPomodoroMenu((current) => !current)}
+              type="button"
+            >
+              <span className="planner-button__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 8.5C7.6 8.5 4 12 4 16c0 3.7 3.3 6.6 8 6.6s8-2.9 8-6.6c0-4-3.6-7.5-8-7.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                  <path d="M12 8.5c0-2.6 1.9-4.1 4.8-4.1-1.6 1.2-2 2.5-2 3.7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                  <path d="M12 8.5c0-1.8-1.3-3-3.5-3.3 1.1.9 1.5 2 1.5 3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                  <path d="M12.1 8.5c-1.1-1-2.8-1.3-4.3-.8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                </svg>
+              </span>
+            </MotionButton>
+
+            {showPomodoroMenu ? (
+              <div aria-label={copy.pomodoro.settings} className="planner-mini-menu" role="menu">
+                {isPomodoroRunning ? (
+                  <div className="planner-mini-menu__countdown-shell">
+                    <div className="planner-mini-menu__countdown" aria-live="polite">
+                      {formatCountdown(remainingSeconds)}
+                    </div>
+                    <div className="planner-mini-menu__countdown-actions">
+                      <MotionButton
+                        className="planner-mini-menu__countdown-action"
+                        motionPreset="subtle"
+                        onClick={() => setIsPomodoroPaused((current) => !current)}
+                        role="menuitem"
+                        type="button"
+                      >
+                        {isPomodoroPaused ? 'Resume' : 'Pause'}
+                      </MotionButton>
+                      <MotionButton
+                        className="planner-mini-menu__countdown-action planner-mini-menu__countdown-action--ghost"
+                        motionPreset="subtle"
+                        onClick={exitPomodoroProcess}
+                        role="menuitem"
+                        type="button"
+                      >
+                        Exit Process
+                      </MotionButton>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="planner-mini-menu__section">
+                      <p className="planner-mini-menu__title">{copy.pomodoro.focusMinutes}</p>
+                      <div className="planner-mini-menu__options">
+                        {[15, 25, 45, 60].map((value) => (
+                          <MotionButton
+                            aria-checked={focusMinutes === value}
+                            className={`planner-mini-menu__option ${focusMinutes === value ? 'is-active' : ''}`}
+                            key={`focus-${value}`}
+                            motionPreset="subtle"
+                            onClick={() => setFocusMinutes(value)}
+                            role="menuitemradio"
+                            type="button"
+                          >
+                            {value}m
+                          </MotionButton>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="planner-mini-menu__section">
+                      <p className="planner-mini-menu__title">{copy.pomodoro.breakMinutes}</p>
+                      <div className="planner-mini-menu__options">
+                        {[3, 5, 10, 15].map((value) => (
+                          <MotionButton
+                            aria-checked={breakMinutes === value}
+                            className={`planner-mini-menu__option ${breakMinutes === value ? 'is-active' : ''}`}
+                            key={`break-${value}`}
+                            motionPreset="subtle"
+                            onClick={() => setBreakMinutes(value)}
+                            role="menuitemradio"
+                            type="button"
+                          >
+                            {value}m
+                          </MotionButton>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="planner-mini-menu__section">
+                      <p className="planner-mini-menu__title">{copy.pomodoro.cycles}</p>
+                      <div className="planner-mini-menu__options">
+                        {[2, 4, 6].map((value) => (
+                          <MotionButton
+                            aria-checked={pomodoroCycles === value}
+                            className={`planner-mini-menu__option ${pomodoroCycles === value ? 'is-active' : ''}`}
+                            key={`cycle-${value}`}
+                            motionPreset="subtle"
+                            onClick={() => setPomodoroCycles(value)}
+                            role="menuitemradio"
+                            type="button"
+                          >
+                            {value}
+                          </MotionButton>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="planner-mini-menu__section planner-mini-menu__section--toggles">
+                      <MotionButton
+                        aria-checked={autoStartNext}
+                        className={`planner-mini-menu__toggle ${autoStartNext ? 'is-active' : ''}`}
+                        motionPreset="subtle"
+                        onClick={() => setAutoStartNext((current) => !current)}
+                        role="menuitemcheckbox"
+                        type="button"
+                      >
+                        <span>{copy.pomodoro.autoStart}</span>
+                        <span>{autoStartNext ? 'ON' : 'OFF'}</span>
+                      </MotionButton>
+
+                      <MotionButton
+                        aria-checked={soundEnabled}
+                        className={`planner-mini-menu__toggle ${soundEnabled ? 'is-active' : ''}`}
+                        motionPreset="subtle"
+                        onClick={() => setSoundEnabled((current) => !current)}
+                        role="menuitemcheckbox"
+                        type="button"
+                      >
+                        <span>{copy.pomodoro.sound}</span>
+                        <span>{soundEnabled ? 'ON' : 'OFF'}</span>
+                      </MotionButton>
+                    </div>
+
+                    <div className="planner-mini-menu__footer">
+                      <span className="planner-mini-menu__status">
+                        {`${focusMinutes}/${breakMinutes}m x ${pomodoroCycles}`}
+                      </span>
+                      <MotionButton
+                        className="planner-mini-menu__action"
+                        motionPreset="subtle"
+                        onClick={startPomodoroTimer}
+                        role="menuitem"
+                        type="button"
+                      >
+                        {copy.pomodoro.startTimer}
+                      </MotionButton>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : null}
+          </div>
+
           <MotionButton
             className="planner-button planner-button--ghost"
             onClick={() =>
