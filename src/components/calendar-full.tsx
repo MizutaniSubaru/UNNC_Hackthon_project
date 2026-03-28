@@ -122,15 +122,17 @@ function toColorString(color: RgbColor, alpha = 1) {
 function buildEventPalette(accent: string): EventPalette {
   const base = parseHexColor(accent);
   const white = { blue: 255, green: 255, red: 255 };
-  const warmPaper = { blue: 238, green: 244, red: 250 };
+
+  // Use a fully opaque, unified background mixed with pure white to match Month and Week precisely
+  const unifiedBackground = toColorString(mixColors(base, white, 0.88), 1);
 
   return {
     accent: toColorString(base),
-    borderColor: toColorString(mixColors(base, white, 0.56), 0.95),
-    monthEnd: toColorString(mixColors(base, white, 0.82), 0.96),
-    monthStart: toColorString(mixColors(base, warmPaper, 0.9), 0.98),
-    weekEnd: toColorString(mixColors(base, white, 0.8), 0.98),
-    weekStart: toColorString(mixColors(base, warmPaper, 0.92), 0.98),
+    borderColor: toColorString(mixColors(base, white, 0.60), 1),
+    monthEnd: unifiedBackground,
+    monthStart: unifiedBackground,
+    weekEnd: unifiedBackground,
+    weekStart: unifiedBackground,
   };
 }
 
@@ -183,8 +185,8 @@ function buildEventStyle(eventProps: CalendarEventExtendedProps): CSSProperties 
     '--planner-calendar-border': eventProps.borderColor,
     '--planner-calendar-month-end': eventProps.monthEnd,
     '--planner-calendar-month-start': eventProps.monthStart,
-    '--planner-calendar-week-end': eventProps.weekEnd,
-    '--planner-calendar-week-start': eventProps.weekStart,
+    '--planner-calendar-week-end': eventProps.monthEnd,
+    '--planner-calendar-week-start': eventProps.monthStart,
   } as CSSProperties;
 }
 

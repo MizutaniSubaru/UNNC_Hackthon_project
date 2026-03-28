@@ -325,6 +325,7 @@ function ConfirmationModal({
   }
 
   function handleDraftStartConfirm(nextStart: string) {
+    if (!draft) return;
     const nextEnd = ensureEndAfterStartValue(nextStart, draft.end_at);
     onChange({
       ...draft,
@@ -334,6 +335,7 @@ function ConfirmationModal({
   }
 
   function handleDraftEndConfirm(nextEndInput: string) {
+    if (!draft) return;
     const nextEnd = ensureEndAfterStartValue(draft.start_at, nextEndInput);
     onChange({
       ...draft,
@@ -710,10 +712,12 @@ function HistoryTimeline({
 }: HistoryTimelineProps) {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [prevLogs, setPrevLogs] = useState(logs);
 
-  useEffect(() => {
+  if (logs !== prevLogs) {
+    setPrevLogs(logs);
     setSelectedIds((current) => current.filter((id) => logs.some((log) => log.id === id)));
-  }, [logs]);
+  }
 
   function exitSelectMode() {
     setSelectMode(false);

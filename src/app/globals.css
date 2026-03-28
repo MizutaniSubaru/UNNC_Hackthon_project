@@ -967,8 +967,7 @@ button:disabled {
 }
 
 .planner-calendar-month-event,
-.planner-calendar-week-event__frame,
-.planner-calendar-week-event__measure {
+.planner-calendar-week-event {
   --planner-calendar-accent: #4f7cff;
   --planner-calendar-border: rgba(79, 124, 255, 0.28);
   --planner-calendar-month-start: rgba(244, 248, 255, 0.98);
@@ -987,9 +986,7 @@ button:disabled {
   border-radius: 10px;
   padding: 3px 8px;
   color: #17304f;
-  background: linear-gradient(135deg,
-      var(--planner-calendar-month-start) 0%,
-      var(--planner-calendar-month-end) 100%);
+  background: var(--planner-calendar-month-start);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
   overflow: hidden;
 }
@@ -1032,10 +1029,12 @@ button:disabled {
   border-radius: 8px;
   padding: 6px 8px;
   color: #17304f;
-  background: linear-gradient(140deg,
-      var(--planner-calendar-week-start) 0%,
-      var(--planner-calendar-week-end) 100%);
+  background: var(--planner-calendar-month-start);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.planner-calendar-week-event__frame > div {
+  background: transparent;
 }
 
 .planner-calendar-week-event__frame {
