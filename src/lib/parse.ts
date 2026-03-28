@@ -35,6 +35,11 @@ type PartialParseResult = Partial<ParseResult> & {
   type?: unknown;
 };
 
+type SplitSchedulesPayload = {
+  items?: unknown;
+  schedules?: unknown;
+};
+
 export type TemporalIntentKind =
   | 'none'
   | 'specific_day'
@@ -1153,6 +1158,120 @@ Rules:
   ];
 }
 
+function buildMultiScheduleAiMessages(input: {
+  locale: string;
+  now: string;
+  text: string;
+  timezone: string;
+}) {
+  const { locale, now, text, timezone } = input;
+
+  return [
+    {
+      role: 'system' as const,
+      content: `
+You are a bilingual planning assistant that extracts multiple schedules from one user input.
+Return only a JSON object with key: items.
+
+Schema:
+- items: string[]
+
+Rules:
+- Each item must be a self-contained schedule sentence that keeps original time, location, and intent.
+- Split when the user clearly lists multiple independent tasks/events.
+- Keep the original language for each item.
+- If there is only one schedule, return items with one element.
+- Do not invent schedules.
+- Maximum 8 items.
+- Respect locale ${locale}, timezone ${timezone}, current timestamp ${now}.
+      `.trim(),
+    },
+    {
+      role: 'user' as const,
+      content: text,
+    },
+  ];
+}
+
+function normalizeSplitSchedules(payload: SplitSchedulesPayload | null, text: string) {
+  function extractItems(raw: unknown) {
+    if (!Array.isArray(raw)) {
+      return [] as string[];
+    }
+
+    return raw
+      .map((entry) => {
+        if (typeof entry === 'string') {
+          return entry;
+        }
+
+        if (entry && typeof entry === 'object') {
+          const record = entry as Record<string, unknown>;
+          if (typeof record.text === 'string') {
+            return record.text;
+          }
+
+          if (typeof record.content === 'string') {
+            return record.content;
+          }
+
+          if (typeof record.title === 'string') {
+            return record.title;
+          }
+        }
+
+        return '';
+      })
+      .map((value) => normalizeSpacing(value))
+      .filter(Boolean);
+  }
+
+  const itemsFromDirectField = extractItems(payload?.items);
+  const itemsFromSchedulesField = extractItems(payload?.schedules);
+  const aiItems =
+    itemsFromDirectField.length > 0 ? itemsFromDirectField : itemsFromSchedulesField;
+
+  const heuristicItems = text
+    .split(/\r?\n|[；;]+/)
+    .map((value) => normalizeSpacing(value))
+    .filter(Boolean);
+
+  let candidates: string[];
+
+  if (aiItems.length > 0 && heuristicItems.length > 1) {
+    candidates = aiItems.length >= heuristicItems.length ? aiItems : heuristicItems;
+  } else if (aiItems.length > 0) {
+    candidates = aiItems;
+  } else if (heuristicItems.length > 1) {
+    candidates = heuristicItems;
+  } else {
+    candidates = [normalizeSpacing(text)];
+  }
+  const unique: string[] = [];
+  const seen = new Set<string>();
+
+  for (const candidate of candidates) {
+    const normalized = normalizeSpacing(candidate);
+    if (!normalized) {
+      continue;
+    }
+
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    unique.push(normalized);
+
+    if (unique.length >= 8) {
+      break;
+    }
+  }
+
+  return unique.length > 0 ? unique : [normalizeSpacing(text)];
+}
+
 export function buildExtractedFields(
   result: ParseResult,
   timezone = DEFAULT_TIMEZONE
@@ -1181,6 +1300,20 @@ function buildParseResponse(
     extracted_fields: buildExtractedFields(result, timezone),
     mode,
     result,
+  };
+}
+
+function buildMultiParseResponse(responses: ParseResponse[]): ParseResponse {
+  const [first] = responses;
+  const results = responses.map((response) => response.result);
+  const extractedFieldsList = responses.map((response) => response.extracted_fields);
+
+  return {
+    extracted_fields: first.extracted_fields,
+    extracted_fields_list: extractedFieldsList,
+    mode: responses.some((response) => response.mode === 'ai') ? 'ai' : 'fallback',
+    result: first.result,
+    results,
   };
 }
 
@@ -1230,4 +1363,70 @@ export async function parseInputWithAi(input: {
   });
 
   return buildParseResponse('fallback', fallback, timezone);
+}
+
+export async function parseMultipleInputWithAi(input: {
+  locale?: string;
+  text: string;
+  timezone?: string;
+}): Promise<ParseResponse> {
+  const { locale = 'en-US', text, timezone = DEFAULT_TIMEZONE } = input;
+  const trimmed = normalizeSpacing(text);
+
+  if (!trimmed) {
+    return parseInputWithAi({ locale, text, timezone });
+  }
+
+  const aiConfig = getAiConfig('parse');
+  let scheduleTexts = [trimmed];
+
+  if (aiConfig.apiKey) {
+    const now = new Date().toISOString();
+    try {
+      const splitPayload = await requestAiJson<SplitSchedulesPayload>({
+        messages: buildMultiScheduleAiMessages({
+          locale,
+          now,
+          text: trimmed,
+          timezone,
+        }),
+        parse: (content) => parseJson<SplitSchedulesPayload>(content),
+        task: 'parse',
+      });
+
+      scheduleTexts = normalizeSplitSchedules(splitPayload, trimmed);
+    } catch {
+      logAiJsonMetrics({
+        fastPath: false,
+        outcome: 'skip',
+        reason: 'multi_schedule_split_failed',
+        task: 'parse',
+      });
+      scheduleTexts = normalizeSplitSchedules(null, trimmed);
+    }
+  } else {
+    scheduleTexts = normalizeSplitSchedules(null, trimmed);
+  }
+
+  const responses: ParseResponse[] = [];
+  for (const scheduleText of scheduleTexts) {
+    responses.push(
+      await parseInputWithAi({
+        locale,
+        text: scheduleText,
+        timezone,
+      })
+    );
+  }
+
+  if (responses.length === 1) {
+    const [single] = responses;
+    return {
+      ...single,
+      extracted_fields_list: [single.extracted_fields],
+      results: [single.result],
+    };
+  }
+
+  return buildMultiParseResponse(responses);
 }

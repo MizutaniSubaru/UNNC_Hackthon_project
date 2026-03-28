@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { parseInputWithAi } from '@/lib/parse';
+import { parseMultipleInputWithAi } from '@/lib/parse';
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const parsed = await parseInputWithAi({
+    const parsed = await parseMultipleInputWithAi({
       locale: typeof locale === 'string' ? locale : 'en-US',
       text,
       timezone: typeof timezone === 'string' ? timezone : undefined,
