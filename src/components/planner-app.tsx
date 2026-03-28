@@ -340,12 +340,6 @@ function ComposerPanel({
       </div>
 
       <div className="planner-stack planner-stack--compact">
-        <p className="composer-panel__hint">
-          {isChinese
-            ? '可以直接写时间范围、开始时间加持续时长，或者一条普通待办。按 Enter 提交，Shift + Enter 换行。'
-            : 'Write a time range, a start time with duration, or a plain to-do. Press Enter to analyze and Shift + Enter for a new line.'}
-        </p>
-
         <textarea
           className="composer-textarea"
           onChange={(event) => setComposerText(event.target.value)}
@@ -385,6 +379,12 @@ function ComposerPanel({
             {uploadLabel}
           </MotionButton>
         </div>
+
+        <p className="composer-upload-note">
+          {isChinese
+            ? '这是一个 基于 OCR 识图技术的Beta 测试版，结果可能会出现偏差'
+            : 'This is a beta OCR image-recognition feature, so results may be inaccurate.'}
+        </p>
 
         {imageSelection ? (
           <article className="composer-upload-card">

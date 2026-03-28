@@ -683,7 +683,7 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.composer-panel__hint,
+.composer-upload-note,
 .intake-guide__lead,
 .intake-example__text {
   margin: 0;
@@ -691,7 +691,13 @@ button:disabled {
   line-height: 1.55;
 }
 
-.composer-panel__hint,
+.composer-upload-note {
+  align-self: flex-start;
+  max-width: 40ch;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
 .intake-guide__lead {
   max-width: 56ch;
   margin-inline: auto;
