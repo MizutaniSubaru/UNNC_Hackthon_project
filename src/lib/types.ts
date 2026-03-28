@@ -55,6 +55,28 @@ export type UpdateItemPayload = Partial<CreateItemPayload> & {
 
 export type ActivityAction = 'created' | 'updated' | 'completed' | 'deleted' | 'undo';
 
+export type SearchMode = 'keyword' | 'ai';
+
+export type SearchHit = {
+  item: Item;
+  matched_at: string | null;
+  reason: string;
+};
+
+export type SearchTimeRange = {
+  end: string;
+  label: string;
+  start: string;
+};
+
+export type SearchResponse = {
+  fallbackToKeyword: boolean;
+  mode: SearchMode;
+  query: string;
+  results: SearchHit[];
+  timeRange: SearchTimeRange | null;
+};
+
 export type LocaleCopy = {
   actions: {
     analyze: string;

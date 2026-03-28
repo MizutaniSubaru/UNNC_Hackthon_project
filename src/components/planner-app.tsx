@@ -27,6 +27,9 @@ import type {
   ItemType,
   ParseResult,
   Priority,
+  SearchHit,
+  SearchMode,
+  SearchResponse,
 } from '@/lib/types';
 
 type ConfirmationModalProps = {
@@ -65,6 +68,21 @@ type HistoryTimelineProps = {
   logs: ActivityLog[];
   onDeleteLogs: (logIds: string[]) => Promise<void>;
   onUndoLogs: (logIds: string[]) => Promise<void>;
+};
+
+type SearchResultsPanelProps = {
+  fallbackToKeyword: boolean;
+  locale: string;
+  mode: SearchMode;
+  onClear: () => void;
+  onModeChange: (mode: SearchMode) => void;
+  onQueryChange: (value: string) => void;
+  onSearch: () => void;
+  onSelectItem: (item: Item) => void;
+  query: string;
+  results: SearchHit[];
+  searching: boolean;
+  timeRangeLabel: string | null;
 };
 
 function resolveLocale() {
@@ -145,34 +163,34 @@ async function fetchWorkspace(
 function GuidePanel({ copy, locale }: { copy: typeof COPY.en; locale: string }) {
   const isChinese = locale.startsWith('zh');
   const examples = isChinese
-      ? [
-        {
-          label: '开始时间 + 结束时间 + 地点',
-          text: '周三下午 2 点到 3 点半在 Trent Building 和导师开会',
-        },
-        {
-          label: '开始时间 + 持续时长 + 地点',
-          text: '明天 10:00 在 Portland Building 写 90 分钟 project proposal',
-        },
-        {
-          label: 'To-Do',
-          text: '买打印纸并提交报销',
-        },
-      ]
+    ? [
+      {
+        label: '开始时间 + 结束时间 + 地点',
+        text: '周三下午 2 点到 3 点半在 Trent Building 和导师开会',
+      },
+      {
+        label: '开始时间 + 持续时长 + 地点',
+        text: '明天 10:00 在 Portland Building 写 90 分钟 project proposal',
+      },
+      {
+        label: 'To-Do',
+        text: '买打印纸并提交报销',
+      },
+    ]
     : [
-        {
-          label: 'Start time + end time + location',
-          text: 'Meet my advisor on Wednesday from 2:00 PM to 3:30 PM in Trent Building.',
-        },
-        {
-          label: 'Start time + duration + location',
-          text: 'Start writing the project proposal tomorrow at 10:00 AM in Portland Building for 90 minutes.',
-        },
-        {
-          label: 'To-do',
-          text: 'Buy printer paper and submit the reimbursement form.',
-        },
-      ];
+      {
+        label: 'Start time + end time + location',
+        text: 'Meet my advisor on Wednesday from 2:00 PM to 3:30 PM in Trent Building.',
+      },
+      {
+        label: 'Start time + duration + location',
+        text: 'Start writing the project proposal tomorrow at 10:00 AM in Portland Building for 90 minutes.',
+      },
+      {
+        label: 'To-do',
+        text: 'Buy printer paper and submit the reimbursement form.',
+      },
+    ];
 
   return (
     <section className="planner-panel planner-panel--guide">
@@ -318,6 +336,10 @@ function ConfirmationModal({
   }
 
   function handleDraftStartConfirm(nextStart: string) {
+    if (!draft) {
+      return;
+    }
+
     const nextEnd = ensureEndAfterStartValue(nextStart, draft.end_at);
     onChange({
       ...draft,
@@ -327,6 +349,10 @@ function ConfirmationModal({
   }
 
   function handleDraftEndConfirm(nextEndInput: string) {
+    if (!draft) {
+      return;
+    }
+
     const nextEnd = ensureEndAfterStartValue(draft.start_at, nextEndInput);
     onChange({
       ...draft,
@@ -823,6 +849,129 @@ function HistoryTimeline({
   );
 }
 
+function SearchResultsPanel({
+  fallbackToKeyword,
+  locale,
+  mode,
+  onClear,
+  onModeChange,
+  onQueryChange,
+  onSearch,
+  onSelectItem,
+  query,
+  results,
+  searching,
+  timeRangeLabel,
+}: SearchResultsPanelProps) {
+  const isChinese = locale.startsWith('zh');
+
+  return (
+    <section className="planner-panel planner-panel--search">
+      <div className="planner-panel__header">
+        <div>
+          <p className="planner-panel__eyebrow">{isChinese ? '智能搜索' : 'Smart search'}</p>
+          <h2 className="planner-panel__title">
+            {isChinese ? '关键词 / AI 语义检索' : 'Keyword / AI semantic search'}
+          </h2>
+        </div>
+      </div>
+
+      <div className="search-panel__controls">
+        <input
+          onChange={(event) => onQueryChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onSearch();
+            }
+          }}
+          placeholder={
+            isChinese
+              ? '例如：我上周做了些什么'
+              : 'Try: What did I do last week?'
+          }
+          value={query}
+        />
+
+        <label className="field field--checkbox search-panel__toggle">
+          <span>{isChinese ? 'AI 模糊搜索（慢）' : 'AI fuzzy search (slower)'}</span>
+          <input
+            checked={mode === 'ai'}
+            onChange={(event) => onModeChange(event.target.checked ? 'ai' : 'keyword')}
+            type="checkbox"
+          />
+        </label>
+
+        <div className="search-panel__actions">
+          <button className="planner-button" disabled={!query.trim() || searching} onClick={onSearch} type="button">
+            {searching
+              ? isChinese
+                ? '搜索中...'
+                : 'Searching...'
+              : isChinese
+                ? '搜索'
+                : 'Search'}
+          </button>
+          <button className="planner-button planner-button--ghost" onClick={onClear} type="button">
+            {isChinese ? '清空' : 'Clear'}
+          </button>
+        </div>
+      </div>
+
+      {timeRangeLabel ? (
+        <p className="panel-note">
+          {isChinese ? '时间范围：' : 'Time range: '}
+          {timeRangeLabel}
+        </p>
+      ) : null}
+
+      {fallbackToKeyword ? (
+        <p className="panel-note panel-note--warning">
+          {isChinese
+            ? 'AI 搜索暂时不可用，已自动回退为关键词搜索。'
+            : 'AI search is temporarily unavailable. Automatically fell back to keyword search.'}
+        </p>
+      ) : null}
+
+      <div className="search-panel__results">
+        {!query.trim() ? (
+          <p className="todo-list__empty">
+            {isChinese ? '输入搜索内容后可查看结果。' : 'Enter a query to view results.'}
+          </p>
+        ) : null}
+
+        {query.trim() && !searching && results.length === 0 ? (
+          <p className="todo-list__empty">
+            {isChinese ? '没有匹配到结果。' : 'No results matched your query.'}
+          </p>
+        ) : null}
+
+        {results.map((result) => (
+          <article className="search-result-card" key={result.item.id}>
+            <button className="search-result-card__main" onClick={() => onSelectItem(result.item)} type="button">
+              <div>
+                <div className="search-result-card__meta">
+                  <span className="planner-badge">{result.item.type}</span>
+                  <span>{result.item.group_key}</span>
+                  <span>{result.item.status}</span>
+                </div>
+                <h3>{result.item.title}</h3>
+                {result.matched_at ? (
+                  <p>
+                    {isChinese ? '匹配时间：' : 'Matched at: '}
+                    {formatDateTimeLabel(result.matched_at, locale, DEFAULT_TIMEZONE)}
+                  </p>
+                ) : null}
+                <p>{result.reason}</p>
+              </div>
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function EmptyWorkspace({ copy }: { copy: typeof COPY.en }) {
   return (
     <main className="landing-shell">
@@ -861,6 +1010,12 @@ export function PlannerApp() {
   const [groupFilter, setGroupFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [historyBusy, setHistoryBusy] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('keyword');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
+  const [searchRangeLabel, setSearchRangeLabel] = useState<string | null>(null);
+  const [searchFallback, setSearchFallback] = useState(false);
 
   const deferredSearch = useDeferredValue(search);
   const copy = resolveCopy(locale);
@@ -1134,6 +1289,48 @@ export function PlannerApp() {
     }
   }
 
+  async function runSearch(modeOverride?: SearchMode) {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setSearchRangeLabel(null);
+      setSearchFallback(false);
+      return;
+    }
+
+    const effectiveMode = modeOverride ?? searchMode;
+
+    setSearching(true);
+    setMessage(null);
+
+    try {
+      const payload = (await jsonRequest('/api/search', {
+        body: JSON.stringify({
+          locale,
+          mode: effectiveMode,
+          query: trimmed,
+          timezone,
+        }),
+        method: 'POST',
+      })) as SearchResponse;
+
+      setSearchResults(Array.isArray(payload.results) ? payload.results : []);
+      setSearchRangeLabel(payload.timeRange?.label ?? null);
+      setSearchFallback(Boolean(payload.fallbackToKeyword));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Failed to search items.');
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function clearSearch() {
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchRangeLabel(null);
+    setSearchFallback(false);
+  }
+
   const activeItems = items.filter(
     (item) => item.status !== 'completed' && item.status !== 'cancelled'
   );
@@ -1214,6 +1411,28 @@ export function PlannerApp() {
           onAnalyze={() => void handleAnalyze()}
           setComposerText={setComposerText}
           text={composerText}
+        />
+      </section>
+
+      <section className="planner-grid">
+        <SearchResultsPanel
+          fallbackToKeyword={searchFallback}
+          locale={locale}
+          mode={searchMode}
+          onClear={clearSearch}
+          onModeChange={(nextMode) => {
+            setSearchMode(nextMode);
+            if (searchQuery.trim()) {
+              void runSearch(nextMode);
+            }
+          }}
+          onQueryChange={setSearchQuery}
+          onSearch={() => void runSearch()}
+          onSelectItem={setSelectedItem}
+          query={searchQuery}
+          results={searchResults}
+          searching={searching}
+          timeRangeLabel={searchRangeLabel}
         />
       </section>
 
