@@ -102,6 +102,7 @@ type HistoryTimelineProps = {
 };
 
 type SearchResultsPanelProps = {
+  compact?: boolean;
   fallbackToKeyword: boolean;
   locale: string;
   mode: SearchMode;
@@ -959,6 +960,7 @@ function HistoryTimeline({
 }
 
 function SearchResultsPanel({
+  compact = false,
   fallbackToKeyword,
   locale,
   mode,
@@ -973,9 +975,10 @@ function SearchResultsPanel({
   timeRangeLabel,
 }: SearchResultsPanelProps) {
   const isChinese = locale.startsWith('zh');
+  const panelClassName = `planner-panel planner-panel--search${compact ? ' planner-panel--search-compact' : ''}`;
 
   return (
-    <section className="planner-panel planner-panel--search">
+    <section className={panelClassName}>
       <div className="planner-panel__header">
         <div>
           <h2 className="planner-panel__title">
@@ -1948,8 +1951,10 @@ export function PlannerApp() {
       {message ? <div className="planner-toast">{message}</div> : null}
 
       <section className="planner-grid planner-grid--top">
-        <GuidePanel copy={copy} locale={locale} />
-        <div className="planner-stack planner-stack--composer-column">
+        <div className="planner-top-cell planner-top-cell--guide">
+          <GuidePanel copy={copy} locale={locale} />
+        </div>
+        <div className="planner-top-cell planner-top-cell--composer">
           <ComposerPanel
             busy={busy}
             copy={copy}
@@ -1958,30 +1963,32 @@ export function PlannerApp() {
             setComposerText={setComposerText}
             text={composerText}
           />
+        </div>
+        <div className="planner-top-search-slot">
+          <SearchResultsPanel
+            compact
+            fallbackToKeyword={searchFallback}
+            locale={locale}
+            mode={searchMode}
+            onClear={clearSearch}
+            onModeChange={(nextMode) => {
+              setSearchMode(nextMode);
+              if (searchQuery.trim()) {
+                void runSearch(nextMode);
+              }
+            }}
+            onQueryChange={setSearchQuery}
+            onSearch={() => void runSearch()}
+            onSelectItem={setSelectedItem}
+            query={searchQuery}
+            results={searchResults}
+            searching={searching}
+            timeRangeLabel={searchRangeLabel}
+          />
+        </div>
+        <div className="planner-top-cell planner-top-cell--quote">
           <QuoteRotator locale={locale} />
         </div>
-      </section>
-
-      <section className="planner-grid">
-        <SearchResultsPanel
-          fallbackToKeyword={searchFallback}
-          locale={locale}
-          mode={searchMode}
-          onClear={clearSearch}
-          onModeChange={(nextMode) => {
-            setSearchMode(nextMode);
-            if (searchQuery.trim()) {
-              void runSearch(nextMode);
-            }
-          }}
-          onQueryChange={setSearchQuery}
-          onSearch={() => void runSearch()}
-          onSelectItem={setSelectedItem}
-          query={searchQuery}
-          results={searchResults}
-          searching={searching}
-          timeRangeLabel={searchRangeLabel}
-        />
       </section>
 
       <ConfirmationModal
