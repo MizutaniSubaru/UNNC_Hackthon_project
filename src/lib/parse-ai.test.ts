@@ -20,6 +20,7 @@ mock.module('@/lib/ai-provider', () => ({
   },
 }));
 
+const { buildParseRequestText } = await import('@/lib/parse-request');
 const { parseInputWithAi } = await import('@/lib/parse');
 
 describe('parseInputWithAi', () => {
@@ -84,5 +85,31 @@ describe('parseInputWithAi', () => {
     expect(parsed.result.title).toBe('\u5f00\u7ec4\u4f1a');
     expect(parsed.result.location).toBe('Jubilee Campus');
     expect(parsed.extracted_fields.priority).toBe('high');
+  });
+
+  it('keeps labeled OCR sections intact when building AI messages', async () => {
+    queuedPayload = {
+      ambiguity_reason: null,
+      confidence: 0.91,
+      location: 'Trent Building',
+      needs_confirmation: false,
+      priority: 'medium',
+      title: 'Meet my advisor',
+    };
+
+    const combinedRequest = buildParseRequestText({
+      imageText: 'Wednesday 3:00 PM Trent Building',
+      text: 'Book a meeting with my advisor',
+    });
+
+    await parseInputWithAi({
+      locale: 'en-US',
+      text: combinedRequest,
+      timezone: 'Asia/Shanghai',
+    });
+
+    const messages = lastRequestInput?.messages as Array<{ content: string; role: string }>;
+    expect(messages[0]?.content).toContain('Extracted from image');
+    expect(messages[1]?.content).toBe(combinedRequest);
   });
 });

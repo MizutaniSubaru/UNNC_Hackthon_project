@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import {
   startTransition,
   useCallback,
@@ -7,7 +8,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ChangeEvent } from 'react';
+import { ImagePlus, X } from 'lucide-react';
 import { CalendarFull } from '@/components/calendar-full';
 import { ItemEditor } from '@/components/item-editor';
 import { PlannerEditorFields } from '@/components/planner-editor-fields';
@@ -19,7 +21,13 @@ import {
   hasInvalidTimedEventRange,
   sanitizeTimingForSubmission,
 } from '@/lib/editor-timing';
+import {
+  convertImageFileToDataUrl,
+  recognizeImageText,
+  terminateImageOcrWorker,
+} from '@/lib/image-ocr';
 import { createLaunchOrigin } from '@/lib/launch-origin';
+import { buildParseRequestText } from '@/lib/parse-request';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import {
   formatDateTimeLabel,
@@ -50,6 +58,15 @@ type ParsedDraft = {
   id: string;
   result: ParseResult;
   sourceText: string;
+};
+
+type ComposerImageState = {
+  dataUrl: string;
+  errorMessage: string | null;
+  fileName: string;
+  mimeType: string;
+  ocrText: string;
+  status: 'error' | 'processing' | 'ready';
 };
 
 type ConfirmationModalProps = {
@@ -266,20 +283,49 @@ function GuidePanel({ locale }: { copy: typeof COPY.en; locale: string }) {
 
 function ComposerPanel({
   busy,
+  canAnalyze,
   copy,
+  imageSelection,
   locale,
   onAnalyze,
+  onClearImage,
+  onImageChange,
   setComposerText,
   text,
 }: {
   busy: boolean;
+  canAnalyze: boolean;
   copy: typeof COPY.en;
+  imageSelection: ComposerImageState | null;
   locale: string;
   onAnalyze: () => void;
+  onClearImage: () => void;
+  onImageChange: (event: ChangeEvent<HTMLInputElement>) => void;
   setComposerText: (value: string) => void;
   text: string;
 }) {
   const isChinese = locale.startsWith('zh');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadLabel = imageSelection
+    ? isChinese
+      ? '更换图片'
+      : 'Replace image'
+    : isChinese
+      ? '上传图片'
+      : 'Upload image';
+  const imageStatusText =
+    imageSelection?.status === 'processing'
+      ? isChinese
+        ? '正在识别图片中的文字...'
+        : 'Extracting text from the image...'
+      : imageSelection?.status === 'error'
+        ? imageSelection.errorMessage ||
+          (isChinese ? '图片识别失败，请换一张更清晰的图片重试。' : 'Image OCR failed. Try a clearer image.')
+        : imageSelection?.status === 'ready'
+          ? isChinese
+            ? '图片文字已提取，分析时会和文本输入一起发送。'
+            : 'Image text is ready and will be analyzed together with your request.'
+          : null;
 
   return (
     <section className="planner-panel planner-panel--composer">
@@ -300,7 +346,7 @@ function ComposerPanel({
           className="composer-textarea"
           onChange={(event) => setComposerText(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !busy && text.trim()) {
+            if (event.key === 'Enter' && !event.shiftKey && !busy && canAnalyze) {
               event.preventDefault();
               onAnalyze();
             }
@@ -314,10 +360,77 @@ function ComposerPanel({
           value={text}
         />
 
+        <input
+          accept="image/*"
+          className="composer-file-input"
+          onChange={onImageChange}
+          ref={fileInputRef}
+          type="file"
+        />
+
+        <div className="composer-actions composer-actions--upload">
+          <MotionButton
+            className="planner-button planner-button--ghost composer-upload-button"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+            type="button"
+          >
+            <span className="planner-button__icon" aria-hidden="true">
+              <ImagePlus />
+            </span>
+            {uploadLabel}
+          </MotionButton>
+        </div>
+
+        {imageSelection ? (
+          <article className="composer-upload-card">
+            <div className="composer-upload-card__preview-wrap">
+              <Image
+                alt={imageSelection.fileName}
+                className="composer-upload-card__preview"
+                height={104}
+                src={imageSelection.dataUrl}
+                unoptimized
+                width={132}
+              />
+            </div>
+
+            <div className="composer-upload-card__body">
+              <p className="composer-upload-card__name">{imageSelection.fileName}</p>
+              <p className="composer-upload-card__meta">{imageSelection.mimeType || 'image/*'}</p>
+              {imageStatusText ? (
+                <p
+                  className={
+                    imageSelection.status === 'error'
+                      ? 'composer-upload-card__status composer-upload-card__status--error'
+                      : 'composer-upload-card__status'
+                  }
+                >
+                  {imageStatusText}
+                </p>
+              ) : null}
+
+              <div className="composer-actions composer-actions--inline">
+                <MotionButton
+                  className="planner-button planner-button--ghost composer-upload-button composer-upload-button--danger"
+                  disabled={busy}
+                  onClick={onClearImage}
+                  type="button"
+                >
+                  <span className="planner-button__icon" aria-hidden="true">
+                    <X />
+                  </span>
+                  {isChinese ? '移除图片' : 'Remove image'}
+                </MotionButton>
+              </div>
+            </div>
+          </article>
+        ) : null}
+
         <div className="composer-actions composer-actions--end">
           <MotionButton
             className="planner-button"
-            disabled={!text.trim() || busy}
+            disabled={!canAnalyze || busy}
             onClick={onAnalyze}
             type="button"
           >
@@ -1109,6 +1222,7 @@ export function PlannerApp() {
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [composerText, setComposerText] = useState('');
+  const [composerImage, setComposerImage] = useState<ComposerImageState | null>(null);
   const [parsedDrafts, setParsedDrafts] = useState<ParsedDraft[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
@@ -1144,6 +1258,7 @@ export function PlannerApp() {
   const [isPomodoroPaused, setIsPomodoroPaused] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const bottomGridRef = useRef<HTMLElement | null>(null);
+  const composerImageRequestIdRef = useRef(0);
   const pomodoroMenuRef = useRef<HTMLDivElement | null>(null);
 
   const copy = resolveCopy(locale);
@@ -1322,6 +1437,13 @@ export function PlannerApp() {
     };
   }, [isPomodoroPaused, isPomodoroRunning, soundEnabled]);
 
+  useEffect(() => {
+    return () => {
+      composerImageRequestIdRef.current += 1;
+      void terminateImageOcrWorker();
+    };
+  }, []);
+
   const closeConfirmation = useCallback(() => {
     setParsedDrafts([]);
     setActiveDraftId(null);
@@ -1370,6 +1492,114 @@ export function PlannerApp() {
     );
   }
 
+  const composerRequestText = buildParseRequestText({
+    imageText: composerImage?.status === 'ready' ? composerImage.ocrText : '',
+    text: composerText,
+  });
+  const canAnalyzeComposer = Boolean(composerRequestText) && composerImage?.status !== 'processing';
+
+  function clearComposerImage() {
+    composerImageRequestIdRef.current += 1;
+    setComposerImage(null);
+  }
+
+  async function handleComposerImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      composerImageRequestIdRef.current += 1;
+      setComposerImage(null);
+      setMessage(locale.startsWith('zh') ? '仅支持图片格式的文件。' : 'Only image files are supported.');
+      return;
+    }
+
+    const requestId = composerImageRequestIdRef.current + 1;
+    composerImageRequestIdRef.current = requestId;
+    setMessage(null);
+
+    let dataUrl = '';
+
+    try {
+      dataUrl = await convertImageFileToDataUrl(file);
+      if (composerImageRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setComposerImage({
+        dataUrl,
+        errorMessage: null,
+        fileName: file.name,
+        mimeType: file.type,
+        ocrText: '',
+        status: 'processing',
+      });
+
+      const ocrText = await recognizeImageText({
+        dataUrl,
+        locale,
+      });
+      if (composerImageRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      if (!ocrText) {
+        const errorMessage = locale.startsWith('zh')
+          ? '图片识别失败，请换一张更清晰的图片重试。'
+          : 'Image OCR did not return readable text. Try a clearer image.';
+
+        setComposerImage({
+          dataUrl,
+          errorMessage,
+          fileName: file.name,
+          mimeType: file.type,
+          ocrText: '',
+          status: 'error',
+        });
+        setMessage(errorMessage);
+        return;
+      }
+
+      setComposerImage({
+        dataUrl,
+        errorMessage: null,
+        fileName: file.name,
+        mimeType: file.type,
+        ocrText,
+        status: 'ready',
+      });
+    } catch (error) {
+      if (composerImageRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : locale.startsWith('zh')
+            ? '图片识别失败，请稍后重试。'
+            : 'Failed to extract text from the image.';
+
+      setComposerImage(
+        dataUrl
+          ? {
+              dataUrl,
+              errorMessage,
+              fileName: file.name,
+              mimeType: file.type,
+              ocrText: '',
+              status: 'error',
+            }
+          : null
+      );
+      setMessage(errorMessage);
+    }
+  }
+
   function upsertDraftResult(draftId: string, nextDraft: ParseResult) {
     setParsedDrafts((current) =>
       current.map((draft) =>
@@ -1402,7 +1632,7 @@ export function PlannerApp() {
   }
 
   async function handleAnalyze() {
-    if (!composerText.trim()) {
+    if (!composerRequestText || composerImage?.status === 'processing') {
       return;
     }
 
@@ -1413,7 +1643,7 @@ export function PlannerApp() {
       const payload = (await jsonRequest('/api/nl/parse', {
         body: JSON.stringify({
           locale,
-          text: composerText,
+          text: composerRequestText,
           timezone,
         }),
         method: 'POST',
@@ -1424,7 +1654,7 @@ export function PlannerApp() {
         throw new Error('No schedule could be extracted.');
       }
 
-      const source = composerText.trim();
+      const source = composerRequestText.trim();
       const baseId = Date.now();
       const nextDrafts = parsedResults.map((result, index) => ({
         id: `${baseId}-${index}`,
@@ -1476,6 +1706,7 @@ export function PlannerApp() {
 
       if (remainingDrafts.length === 0) {
         setComposerText('');
+        setComposerImage(null);
         setActiveDraftId(null);
         setIsConfirmationOpen(false);
         setParseMode(null);
@@ -1538,6 +1769,7 @@ export function PlannerApp() {
 
       if (failedDrafts.length === 0) {
         setComposerText('');
+        setComposerImage(null);
         setParsedDrafts([]);
         setActiveDraftId(null);
         setIsConfirmationOpen(false);
@@ -1958,9 +2190,13 @@ export function PlannerApp() {
         <div className="planner-top-cell planner-top-cell--composer">
           <ComposerPanel
             busy={busy}
+            canAnalyze={canAnalyzeComposer}
             copy={copy}
+            imageSelection={composerImage}
             locale={locale}
             onAnalyze={() => void handleAnalyze()}
+            onClearImage={clearComposerImage}
+            onImageChange={(event) => void handleComposerImageChange(event)}
             setComposerText={setComposerText}
             text={composerText}
           />

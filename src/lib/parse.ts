@@ -1079,6 +1079,7 @@ Rules:
 - Understand common Chinese colloquial time phrases: "明天凌晨一点半到三点半" means 01:30 to 03:30 on the referenced day.
 - Understand common Chinese duration phrases: "两个半小时", "两小时半", and "俩小时半" all mean 150 minutes.
 - If the user only gives a duration without a start time, keep start_at/end_at null and ignore the duration.
+- The input may contain a section labeled "Extracted from image" with OCR text. Use it as supporting context, ignore obvious OCR noise, and stay conservative when inferring time or location from it.
 - Keep title concise. location and notes can be empty.
 - Respect locale ${locale} and timezone ${timezone}.
 - Current timestamp is ${now}.
@@ -1113,6 +1114,7 @@ Rules:
 - Each item must be a self-contained schedule sentence that keeps original time, location, and intent.
 - Split when the user clearly lists multiple independent tasks/events.
 - Keep the original language for each item.
+- The input may contain a section labeled "Extracted from image" with OCR text. Ignore obvious OCR noise and keep only valid schedule content in each item.
 - If there is only one schedule, return items with one element.
 - Do not invent schedules.
 - Maximum 8 items.

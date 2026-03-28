@@ -592,6 +592,93 @@ button:disabled {
     0 18px 36px rgba(44, 69, 115, 0.08);
 }
 
+.composer-file-input {
+  display: none;
+}
+
+.composer-actions--upload {
+  justify-content: flex-start;
+}
+
+.composer-actions--inline {
+  justify-content: flex-start;
+}
+
+.composer-upload-button {
+  gap: 8px;
+  padding-inline: 16px;
+}
+
+.composer-upload-button--danger {
+  color: #8f3523;
+  border-color: rgba(162, 66, 41, 0.22);
+  background: rgba(255, 243, 239, 0.88);
+}
+
+.composer-upload-card {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  padding: 12px;
+  border: 1px solid rgba(20, 33, 61, 0.1);
+  border-radius: 24px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.84), rgba(243, 248, 255, 0.72)),
+    linear-gradient(transparent 90%, rgba(79, 124, 255, 0.05) 90%);
+  box-shadow: 0 14px 34px rgba(44, 69, 115, 0.08);
+}
+
+.composer-upload-card__preview-wrap {
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 132px;
+  border-radius: 18px;
+  background: rgba(226, 234, 247, 0.72);
+}
+
+.composer-upload-card__preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.composer-upload-card__body {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+}
+
+.composer-upload-card__name,
+.composer-upload-card__meta,
+.composer-upload-card__status {
+  margin: 0;
+}
+
+.composer-upload-card__name {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.composer-upload-card__meta {
+  color: rgba(44, 69, 115, 0.82);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.composer-upload-card__status {
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.composer-upload-card__status--error {
+  color: #8f3523;
+}
+
 .composer-actions--end {
   justify-content: flex-end;
 }
@@ -2406,6 +2493,16 @@ button:disabled {
   .planner-panel--guide .planner-panel__title,
   .planner-panel--composer .planner-panel__title {
     max-width: none;
+  }
+
+  .composer-upload-card {
+    flex-direction: column;
+  }
+
+  .composer-upload-card__preview-wrap {
+    flex-basis: auto;
+    width: 100%;
+    max-width: 100%;
   }
 
   .planner-fullcalendar {
