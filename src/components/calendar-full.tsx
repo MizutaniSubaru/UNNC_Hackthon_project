@@ -435,12 +435,7 @@ export function CalendarFull({
 
   return (
     <section className="planner-panel planner-panel--calendar relative">
-      <div className="planner-panel__header flex justify-between items-center pr-2">
-        <div>
-          <p className="planner-panel__eyebrow">
-            {isChinese ? '\u65e5\u5386\u89c6\u56fe\uff08FullCalendar\uff09' : 'Calendar view (FullCalendar)'}
-          </p>
-        </div>
+      <div className="planner-panel__header planner-panel__header--actions-only">
         <CalendarExportButton items={items} locale={locale} />
       </div>
 

@@ -199,7 +199,7 @@ async function fetchWorkspace(
   };
 }
 
-function GuidePanel({ copy, locale }: { copy: typeof COPY.en; locale: string }) {
+function GuidePanel({ locale }: { copy: typeof COPY.en; locale: string }) {
   const isChinese = locale.startsWith('zh');
   const examples = isChinese
     ? [
@@ -235,7 +235,6 @@ function GuidePanel({ copy, locale }: { copy: typeof COPY.en; locale: string }) 
     <section className="planner-panel planner-panel--guide">
       <div className="planner-panel__header">
         <div>
-          <p className="planner-panel__eyebrow">{copy.sections.intake}</p>
           <h2 className="planner-panel__title">
             {isChinese
               ? '用自然语言描述你想创建的安排'
@@ -285,7 +284,6 @@ function ComposerPanel({
     <section className="planner-panel planner-panel--composer">
       <div className="planner-panel__header">
         <div>
-          <p className="planner-panel__eyebrow">{copy.sections.intake}</p>
           <h2 className="planner-panel__title">{isChinese ? '输入你的请求' : 'Write the request'}</h2>
         </div>
       </div>
@@ -404,7 +402,6 @@ function ConfirmationModal({
         <section className="planner-panel planner-panel--confirmation planner-panel--modal planner-panel--confirmation-modal planner-panel--modal-pop">
           <div className="planner-panel__header">
             <div>
-              <p className="planner-panel__eyebrow">{copy.sections.confirmation}</p>
               <h2 className="planner-panel__title" id="confirmation-dialog-title">
                 {activeDraft.result.title}
               </h2>
@@ -544,7 +541,6 @@ function TodoFilterModal({
         <section className="planner-panel planner-panel--modal planner-panel--todo-filter-modal planner-panel--modal-pop">
           <div className="planner-panel__header">
             <div>
-              <p className="planner-panel__eyebrow">{copy.actions.filter}</p>
               <h2 className="planner-panel__title" id="todo-filter-dialog-title">
                 {copy.sections.todo}
               </h2>
@@ -679,7 +675,6 @@ function TodoRail({
     <section className="planner-panel planner-panel--todo">
       <div className="planner-panel__header">
         <div>
-          <p className="planner-panel__eyebrow">{copy.sections.todo}</p>
           <h2 className="planner-panel__title">{copy.todoFilters.title}</h2>
         </div>
         <MotionButton
@@ -781,7 +776,6 @@ function isUndoLog(log: ActivityLog) {
 
 function HistoryTimeline({
   busy,
-  copy,
   locale,
   logs,
   onDeleteLogs,
@@ -811,7 +805,6 @@ function HistoryTimeline({
     <section className="planner-panel planner-panel--history">
       <div className="planner-panel__header">
         <div>
-          <p className="planner-panel__eyebrow">{copy.sections.history}</p>
           <h2 className="planner-panel__title">
             {locale.startsWith('zh') ? '最近的操作轨迹' : 'Recent activity'}
           </h2>
@@ -961,7 +954,6 @@ function SearchResultsPanel({
     <section className="planner-panel planner-panel--search">
       <div className="planner-panel__header">
         <div>
-          <p className="planner-panel__eyebrow">{isChinese ? '智能搜索' : 'Smart search'}</p>
           <h2 className="planner-panel__title">
             {isChinese ? '关键词 / AI 语义检索' : 'Keyword / AI semantic search'}
           </h2>

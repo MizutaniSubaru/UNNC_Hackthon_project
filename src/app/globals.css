@@ -116,7 +116,6 @@ button:disabled {
 }
 
 .planner-hero__eyebrow,
-.planner-panel__eyebrow,
 .landing-card__eyebrow {
   margin: 0 0 10px;
   color: var(--ink-soft);
@@ -461,6 +460,11 @@ button:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.planner-panel__header--actions-only {
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .planner-panel--guide .planner-panel__header,

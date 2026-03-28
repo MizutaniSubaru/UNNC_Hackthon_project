@@ -170,7 +170,6 @@ export function QuoteRotator({ locale }: QuoteRotatorProps) {
         <section className="planner-panel quote-rotator" aria-live="polite">
             <div className="planner-panel__header quote-rotator__header">
                 <div>
-                    <p className="planner-panel__eyebrow">{isChinese ? '动漫语录' : 'Anime Quote'}</p>
                     <h2 className="planner-panel__title quote-rotator__title">
                         {isChinese ? '今日份心动台词' : 'Line of the Moment'}
                     </h2>

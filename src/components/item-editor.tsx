@@ -241,7 +241,6 @@ export function ItemEditor({
         <section className={panelClassName} ref={panelRef}>
           <div className="planner-panel__header item-editor-modal__header">
             <div>
-              <p className="planner-panel__eyebrow">{copy.sections.editor}</p>
               <h2 className="planner-panel__title" id={dialogTitleId}>
                 {item.title}
               </h2>
