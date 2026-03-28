@@ -1018,6 +1018,40 @@ button:disabled {
   animation: planner-modal-pop 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.draft-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.draft-tab {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 132px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 10px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.75);
+  font: inherit;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.draft-tab small {
+  color: inherit;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.draft-tab.is-active {
+  border-color: rgba(79, 124, 255, 0.6);
+  color: var(--ink);
+  background: rgba(79, 124, 255, 0.1);
+}
+
 .planner-panel--modal-launch {
   opacity: 0.22;
   transform:

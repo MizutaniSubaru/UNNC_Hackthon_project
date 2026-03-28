@@ -56,8 +56,10 @@ export type ParseExtractedFields = {
 
 export type ParseResponse = {
   extracted_fields: ParseExtractedFields;
+  extracted_fields_list?: ParseExtractedFields[];
   mode: 'ai' | 'fallback';
   result: ParseResult;
+  results?: ParseResult[];
 };
 
 export type CreateItemPayload = {

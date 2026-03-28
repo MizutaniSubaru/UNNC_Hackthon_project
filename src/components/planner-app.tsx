@@ -36,6 +36,7 @@ import type {
   GroupKey,
   Item,
   LaunchOrigin,
+  ParseResponse,
   ParseResult,
   Priority,
   SearchHit,
@@ -44,17 +45,25 @@ import type {
 } from '@/lib/types';
 import type { TodoRailFilters, TodoSortMode } from '@/lib/todo-rail';
 
+type ParsedDraft = {
+  id: string;
+  result: ParseResult;
+  sourceText: string;
+};
+
 type ConfirmationModalProps = {
+  activeDraftId: string | null;
   busy: boolean;
   copy: typeof COPY.en;
-  draft: ParseResult | null;
+  drafts: ParsedDraft[];
   locale: string;
   mode: 'ai' | 'fallback' | null;
-  onChange: (draft: ParseResult) => void;
-  onCreate: () => void;
+  onActivateDraft: (draftId: string) => void;
+  onChangeDraft: (draftId: string, draft: ParseResult) => void;
+  onCreateAll: () => void;
+  onCreateCurrent: () => void;
   onDismiss: () => void;
   open: boolean;
-  sourceText: string;
 };
 
 type TodoRailProps = {
@@ -116,6 +125,28 @@ function resolveLocale() {
 
 function resolveCopy(locale: string) {
   return locale.startsWith('zh') ? COPY.zh : COPY.en;
+}
+
+function buildDraftTabLabel(index: number, locale: string) {
+  if (!locale.startsWith('zh')) {
+    return `Schedule ${index}`;
+  }
+
+  const numerals = ['\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d', '\u5341'];
+  return `\u65e5\u7a0b${numerals[index - 1] ?? index}`;
+}
+
+function shortTitle(value: string, maxLength = 22) {
+  const normalized = value.trim();
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength)}...`;
 }
 
 function toggleSelection<T extends string>(current: T[], value: T) {
@@ -292,16 +323,18 @@ function ComposerPanel({
 }
 
 function ConfirmationModal({
+  activeDraftId,
   busy,
   copy,
-  draft,
+  drafts,
   locale,
   mode,
-  onChange,
-  onCreate,
+  onActivateDraft,
+  onChangeDraft,
+  onCreateAll,
+  onCreateCurrent,
   onDismiss,
   open,
-  sourceText,
 }: ConfirmationModalProps) {
   useEffect(() => {
     if (!open) {
@@ -331,11 +364,19 @@ function ConfirmationModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onDismiss, open]);
 
-  if (!open || !draft) {
+  if (!open || drafts.length === 0) {
     return null;
   }
 
-  const activeDraft = draft;
+  const activeDraft =
+    drafts.find((draft) => draft.id === activeDraftId) ?? drafts[0] ?? null;
+
+  if (!activeDraft) {
+    return null;
+  }
+
+  const isChinese = locale.startsWith('zh');
+  const isMulti = drafts.length > 1;
 
   return (
     <>
@@ -356,14 +397,14 @@ function ConfirmationModal({
             <div>
               <p className="planner-panel__eyebrow">{copy.sections.confirmation}</p>
               <h2 className="planner-panel__title" id="confirmation-dialog-title">
-                {activeDraft.title}
+                {activeDraft.result.title}
               </h2>
             </div>
             <div className="planner-badges">
               <span className="planner-badge">
                 {mode === 'fallback' ? copy.badges.demoFallback : copy.badges.aiSuggested}
               </span>
-              {activeDraft.needs_confirmation ? (
+              {activeDraft.result.needs_confirmation ? (
                 <span className="planner-badge planner-badge--warning">
                   {copy.badges.needsConfirmation}
                 </span>
@@ -371,30 +412,64 @@ function ConfirmationModal({
             </div>
           </div>
 
+          {isMulti ? (
+            <div
+              aria-label={isChinese ? '\u5df2\u62bd\u53d6\u65e5\u7a0b\u6807\u7b7e' : 'Extracted schedule tabs'}
+              className="draft-tabs"
+              role="tablist"
+            >
+              {drafts.map((draft, index) => {
+                const active = draft.id === activeDraft.id;
+
+                return (
+                  <button
+                    aria-selected={active}
+                    className={`draft-tab ${active ? 'is-active' : ''}`}
+                    key={draft.id}
+                    onClick={() => onActivateDraft(draft.id)}
+                    role="tab"
+                    type="button"
+                  >
+                    <span>{buildDraftTabLabel(index + 1, locale)}</span>
+                    <small>{shortTitle(draft.result.title)}</small>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
           <PlannerEditorFields
             autoFocusTitle
             copy={copy}
             locale={locale}
-            onChange={onChange}
+            onChange={(nextDraft) => onChangeDraft(activeDraft.id, nextDraft)}
             sourceMode="readonly"
-            sourceValue={sourceText}
-            value={activeDraft}
+            sourceValue={activeDraft.sourceText}
+            value={activeDraft.result}
           />
-          {/*
 
-                  ? '结束时间必须晚于开始时间。'
-          */}
-          {activeDraft.ambiguity_reason ? (
-            <p className="panel-note panel-note--warning">{activeDraft.ambiguity_reason}</p>
+          {activeDraft.result.ambiguity_reason ? (
+            <p className="panel-note panel-note--warning">{activeDraft.result.ambiguity_reason}</p>
           ) : null}
 
           <div className="editor-actions">
             <button className="planner-button planner-button--ghost" onClick={onDismiss} type="button">
-              {copy.actions.cancel}
+              {copy.actions.close}
             </button>
-            <button className="planner-button" disabled={busy} onClick={onCreate} type="button">
-              {copy.actions.create}
-            </button>
+            {isMulti ? (
+              <>
+                <button className="planner-button planner-button--ghost" disabled={busy} onClick={onCreateCurrent} type="button">
+                  {isChinese ? '\u521b\u5efa\u5f53\u524d\u65e5\u7a0b' : 'Create current'}
+                </button>
+                <button className="planner-button" disabled={busy} onClick={onCreateAll} type="button">
+                  {isChinese ? '\u521b\u5efa\u5168\u90e8\u65e5\u7a0b' : 'Create all'}
+                </button>
+              </>
+            ) : (
+              <button className="planner-button" disabled={busy} onClick={onCreateCurrent} type="button">
+                {copy.actions.create}
+              </button>
+            )}
           </div>
         </section>
       </div>
@@ -990,7 +1065,8 @@ export function PlannerApp() {
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [composerText, setComposerText] = useState('');
-  const [draft, setDraft] = useState<ParseResult | null>(null);
+  const [parsedDrafts, setParsedDrafts] = useState<ParsedDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [parseMode, setParseMode] = useState<'ai' | 'fallback' | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -1089,7 +1165,8 @@ export function PlannerApp() {
   }, [configured]);
 
   const closeConfirmation = useCallback(() => {
-    setDraft(null);
+    setParsedDrafts([]);
+    setActiveDraftId(null);
     setParseMode(null);
     setIsConfirmationOpen(false);
   }, []);
@@ -1122,6 +1199,50 @@ export function PlannerApp() {
     return payload;
   }
 
+  function normalizeParseResults(payload: ParseResponse) {
+    const candidates = Array.isArray(payload.results) && payload.results.length > 0
+      ? payload.results
+      : payload.result
+        ? [payload.result]
+        : [];
+
+    return candidates.filter(
+      (candidate): candidate is ParseResult =>
+        Boolean(candidate && typeof candidate.title === 'string' && candidate.title.trim())
+    );
+  }
+
+  function upsertDraftResult(draftId: string, nextDraft: ParseResult) {
+    setParsedDrafts((current) =>
+      current.map((draft) =>
+        draft.id === draftId
+          ? {
+              ...draft,
+              result: nextDraft,
+            }
+          : draft
+      )
+    );
+  }
+
+  async function createItemFromDraft(draft: ParsedDraft) {
+    const draftPayload = sanitizeTimingForSubmission(draft.result);
+
+    await jsonRequest('/api/items', {
+      body: JSON.stringify({
+        ...draftPayload,
+        due_date: draftPayload.due_date,
+        end_at: draftPayload.end_at ? toIsoOrNull(draftPayload.end_at) : null,
+        location: draftPayload.location,
+        parse_confidence: draftPayload.confidence,
+        source_text: draft.sourceText,
+        start_at: draftPayload.start_at ? toIsoOrNull(draftPayload.start_at) : null,
+        status: draftPayload.type === 'event' ? 'scheduled' : 'pending',
+      }),
+      method: 'POST',
+    });
+  }
+
   async function handleAnalyze() {
     if (!composerText.trim()) {
       return;
@@ -1131,16 +1252,30 @@ export function PlannerApp() {
     setMessage(null);
 
     try {
-      const payload = await jsonRequest('/api/nl/parse', {
+      const payload = (await jsonRequest('/api/nl/parse', {
         body: JSON.stringify({
           locale,
           text: composerText,
           timezone,
         }),
         method: 'POST',
-      });
+      })) as ParseResponse;
 
-      setDraft(payload.result as ParseResult);
+      const parsedResults = normalizeParseResults(payload);
+      if (parsedResults.length === 0) {
+        throw new Error('No schedule could be extracted.');
+      }
+
+      const source = composerText.trim();
+      const baseId = Date.now();
+      const nextDrafts = parsedResults.map((result, index) => ({
+        id: `${baseId}-${index}`,
+        result,
+        sourceText: source,
+      }));
+
+      setParsedDrafts(nextDrafts);
+      setActiveDraftId(nextDrafts[0]?.id ?? null);
       setParseMode(payload.mode as 'ai' | 'fallback');
       setIsConfirmationOpen(true);
     } catch (error) {
@@ -1150,12 +1285,19 @@ export function PlannerApp() {
     }
   }
 
-  async function handleCreate() {
-    if (!draft) {
+  async function handleCreateCurrent() {
+    if (parsedDrafts.length === 0) {
       return;
     }
 
-    if (hasInvalidTimedEventRange(draft)) {
+    const activeDraft =
+      parsedDrafts.find((draft) => draft.id === activeDraftId) ?? parsedDrafts[0] ?? null;
+
+    if (!activeDraft) {
+      return;
+    }
+
+    if (hasInvalidTimedEventRange(activeDraft.result)) {
       setMessage(
         locale.startsWith('zh')
           ? '结束时间必须晚于开始时间。'
@@ -1168,33 +1310,94 @@ export function PlannerApp() {
     setMessage(null);
 
     try {
-      const draftPayload = sanitizeTimingForSubmission(draft);
+      await createItemFromDraft(activeDraft);
 
-      await jsonRequest('/api/items', {
-        body: JSON.stringify({
-          ...draftPayload,
-          due_date: draftPayload.due_date,
-          end_at: draftPayload.end_at ? toIsoOrNull(draftPayload.end_at) : null,
-          location: draftPayload.location,
-          parse_confidence: draftPayload.confidence,
-          source_text: composerText,
-          start_at: draftPayload.start_at ? toIsoOrNull(draftPayload.start_at) : null,
-          status: draftPayload.type === 'event' ? 'scheduled' : 'pending',
-        }),
-        method: 'POST',
-      });
+      const remainingDrafts = parsedDrafts.filter((draft) => draft.id !== activeDraft.id);
+      setParsedDrafts(remainingDrafts);
 
-      setComposerText('');
-      setDraft(null);
-      setIsConfirmationOpen(false);
-      setParseMode(null);
-      setMessage(locale.startsWith('zh') ? '事项已创建。' : 'Item created.');
+      if (remainingDrafts.length === 0) {
+        setComposerText('');
+        setActiveDraftId(null);
+        setIsConfirmationOpen(false);
+        setParseMode(null);
+      } else {
+        setActiveDraftId(remainingDrafts[0].id);
+      }
+
+      setMessage(
+        locale.startsWith('zh')
+          ? remainingDrafts.length === 0
+            ? '全部事项已创建。'
+            : '当前日程已创建。'
+          : remainingDrafts.length === 0
+            ? 'All schedules created.'
+            : 'Current schedule created.'
+      );
 
       startTransition(() => {
         void loadWorkspace();
       });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to create item.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCreateAll() {
+    if (parsedDrafts.length === 0) {
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+
+    const failedDrafts: ParsedDraft[] = [];
+    let successCount = 0;
+
+    try {
+      for (const draft of parsedDrafts) {
+        if (hasInvalidTimedEventRange(draft.result)) {
+          failedDrafts.push(draft);
+          continue;
+        }
+
+        try {
+          // One request per draft ensures one activity log per change.
+          await createItemFromDraft(draft);
+          successCount += 1;
+        } catch {
+          failedDrafts.push(draft);
+        }
+      }
+
+      if (successCount > 0) {
+        startTransition(() => {
+          void loadWorkspace();
+        });
+      }
+
+      if (failedDrafts.length === 0) {
+        setComposerText('');
+        setParsedDrafts([]);
+        setActiveDraftId(null);
+        setIsConfirmationOpen(false);
+        setParseMode(null);
+        setMessage(
+          locale.startsWith('zh')
+            ? `已创建 ${successCount} 条日程。`
+            : `Created ${successCount} schedules.`
+        );
+        return;
+      }
+
+      setParsedDrafts(failedDrafts);
+      setActiveDraftId(failedDrafts[0]?.id ?? null);
+      setMessage(
+        locale.startsWith('zh')
+          ? `已创建 ${successCount} 条，${failedDrafts.length} 条待修正后重试。`
+          : `Created ${successCount}. ${failedDrafts.length} draft(s) need fixes before retry.`
+      );
     } finally {
       setBusy(false);
     }
@@ -1475,16 +1678,18 @@ export function PlannerApp() {
       </section>
 
       <ConfirmationModal
+        activeDraftId={activeDraftId}
         busy={busy}
         copy={copy}
-        draft={draft}
+        drafts={parsedDrafts}
         locale={locale}
         mode={parseMode}
-        onChange={setDraft}
-        onCreate={() => void handleCreate()}
+        onActivateDraft={setActiveDraftId}
+        onChangeDraft={upsertDraftResult}
+        onCreateAll={() => void handleCreateAll()}
+        onCreateCurrent={() => void handleCreateCurrent()}
         onDismiss={closeConfirmation}
         open={isConfirmationOpen}
-        sourceText={composerText}
       />
 
       <ItemEditor
