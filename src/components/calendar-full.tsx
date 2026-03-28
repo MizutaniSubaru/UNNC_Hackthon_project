@@ -185,8 +185,8 @@ function buildEventStyle(eventProps: CalendarEventExtendedProps): CSSProperties 
     '--planner-calendar-border': eventProps.borderColor,
     '--planner-calendar-month-end': eventProps.monthEnd,
     '--planner-calendar-month-start': eventProps.monthStart,
-    '--planner-calendar-week-end': eventProps.monthEnd,
-    '--planner-calendar-week-start': eventProps.monthStart,
+    '--planner-calendar-week-end': eventProps.weekEnd,
+    '--planner-calendar-week-start': eventProps.weekStart,
   } as CSSProperties;
 }
 
