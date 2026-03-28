@@ -1004,14 +1004,15 @@ function SearchResultsPanel({
           value={query}
         />
 
-        <label className="field field--checkbox search-panel__toggle">
+        <MotionButton
+          aria-pressed={mode === 'ai'}
+          className={`search-panel__toggle${mode === 'ai' ? ' is-active' : ''}`}
+          motionPreset="subtle"
+          onClick={() => onModeChange(mode === 'ai' ? 'keyword' : 'ai')}
+          type="button"
+        >
           <span>{isChinese ? 'AI 模糊搜索（慢）' : 'AI fuzzy search (slower)'}</span>
-          <input
-            checked={mode === 'ai'}
-            onChange={(event) => onModeChange(event.target.checked ? 'ai' : 'keyword')}
-            type="checkbox"
-          />
-        </label>
+        </MotionButton>
 
         <div className="search-panel__actions">
           <MotionButton className="planner-button" disabled={!query.trim() || searching} onClick={onSearch} type="button">
