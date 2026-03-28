@@ -35,7 +35,7 @@ Then configure:
 - `MINIMAX_API_KEY`
 - `MINIMAX_BASE_URL` defaults to `https://api.minimaxi.com/v1`
 - `MINIMAX_MODEL` defaults to `MiniMax-M2.7`
-- `MINIMAX_PARSE_MODEL` defaults to `MiniMax-M2.7-highspeed`
+- `MINIMAX_PARSE_MODEL` defaults to `MiniMax-M2.7`
 - `MINIMAX_SEARCH_INTENT_MODEL` defaults to `MiniMax-M2.7-highspeed`
 - `MINIMAX_SEARCH_RERANK_MODEL` defaults to `MiniMax-M2.7-highspeed`
 - `NEXT_PUBLIC_SUPABASE_URL`
@@ -59,7 +59,7 @@ Supported MiniMax text models in the current provider chain:
 - `MiniMax-M2`
 
 If no AI key is configured, the app falls back to a lightweight heuristic parser for local testing.
-When AI is configured, simple parse/search requests may still take a fast local path first and only call MiniMax for ambiguous or higher-value JSON work.
+When AI is configured, natural-language parsing always calls the parse model so title, time, location, duration, and priority are produced from the stronger reasoning path. Search can still use local shortcuts where appropriate.
 
 ## Supabase Setup
 
