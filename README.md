@@ -20,8 +20,8 @@ An AI-first task calendar manager built with `Next.js`, `Bun`, and `Supabase`.
 - Bun `1.3.11` or newer
 - A Supabase project
 - Optional AI provider credentials:
-  - `OPENAI_*` for OpenAI-compatible models
-  - or `KIMI_*` for Moonshot/Kimi
+  - `MINIMAX_*` for MiniMax OpenAI-compatible models
+  - `OPENAI_*` is still accepted as a migration-compatible fallback
 
 ## Local Setup
 
@@ -32,9 +32,22 @@ cp .env.example .env.local
 
 Then configure:
 
+- `MINIMAX_API_KEY`
+- `MINIMAX_BASE_URL` defaults to `https://api.minimaxi.com/v1`
+- `MINIMAX_MODEL` defaults to `MiniMax-M2.7`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- AI credentials if you want model-backed parsing
+- AI credentials if you want model-backed parsing and search
+
+Supported MiniMax text models in the current provider chain:
+
+- `MiniMax-M2.7`
+- `MiniMax-M2.7-highspeed`
+- `MiniMax-M2.5`
+- `MiniMax-M2.5-highspeed`
+- `MiniMax-M2.1`
+- `MiniMax-M2.1-highspeed`
+- `MiniMax-M2`
 
 If no AI key is configured, the app falls back to a lightweight heuristic parser for local testing.
 
@@ -61,4 +74,5 @@ bun run build
 
 - This is a shared demo workspace, not a production multi-user app.
 - History is stored as an activity feed for `created`, `updated`, `completed`, and `deleted`.
+- The previous `KIMI_*` environment variables are no longer read by the app.
 - Repeating events, reminders, collaboration, and external calendar sync are intentionally out of scope for `v1`.

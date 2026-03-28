@@ -1,5 +1,9 @@
-import { OpenAI } from 'openai';
-import type { APIError } from 'openai/error';
+import {
+  createAiClient,
+  getAiConfig,
+  isRetryableModelError,
+  sanitizeAiJsonContent,
+} from '@/lib/ai-provider';
 import {
   DEFAULT_EVENT_MINUTES,
   DEFAULT_TIMEZONE,
@@ -354,44 +358,28 @@ function normalizeParseResult(payload: PartialParseResult | null, text: string) 
   } satisfies ParseResult;
 }
 
-function getAiConfig() {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.KIMI_API_KEY;
-  const baseURL =
-    process.env.OPENAI_BASE_URL || process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
-  const model = process.env.OPENAI_MODEL || process.env.KIMI_MODEL || 'kimi-k2.5';
-
-  return { apiKey, baseURL, model };
-}
-
 export async function parseInputWithAi(input: {
   locale?: string;
   text: string;
   timezone?: string;
 }) {
   const { locale = 'en-US', text, timezone = DEFAULT_TIMEZONE } = input;
-  const { apiKey, baseURL, model } = getAiConfig();
+  const aiConfig = getAiConfig();
 
-  if (!apiKey) {
+  if (!aiConfig.apiKey) {
     return {
       mode: 'fallback' as const,
       result: fallbackParseInput(text, timezone),
     };
   }
 
-  const openai = new OpenAI({
-    apiKey,
-    baseURL,
-  });
+  const openai = createAiClient(aiConfig);
 
   const now = new Date().toISOString();
 
-  const candidateModels = [model, 'kimi-k2.5', 'moonshot-v1-8k'].filter(
-    (value, index, array) => value && array.indexOf(value) === index
-  );
-
   let lastError: unknown = null;
 
-  for (const candidate of candidateModels) {
+  for (const candidate of aiConfig.candidateModels) {
     try {
       const response = await openai.chat.completions.create({
         model: candidate,
@@ -426,7 +414,7 @@ Rules:
       });
 
       const payload = parseJson<PartialParseResult>(
-        response.choices[0]?.message?.content
+        sanitizeAiJsonContent(response.choices[0]?.message?.content)
       );
 
       return {
@@ -435,12 +423,7 @@ Rules:
       };
     } catch (error) {
       lastError = error;
-      const apiError = error as APIError;
-      const shouldRetry =
-        apiError?.status === 404 ||
-        /not found the model|permission denied/i.test(apiError?.message || '');
-
-      if (!shouldRetry) {
+      if (!isRetryableModelError(error)) {
         throw error;
       }
     }
