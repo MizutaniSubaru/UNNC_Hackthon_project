@@ -6,12 +6,17 @@ import {
 import {
   DEFAULT_EVENT_MINUTES,
   DEFAULT_TIMEZONE,
-  GROUPS,
   MONTH_NAMES_EN,
   PRIORITIES,
 } from '@/lib/constants';
-import { addMinutes } from '@/lib/time';
-import type { GroupKey, ParseResult, Priority } from '@/lib/types';
+import { addMinutes, getDurationMinutes } from '@/lib/time';
+import type {
+  GroupKey,
+  ParseExtractedFields,
+  ParseResponse,
+  ParseResult,
+  Priority,
+} from '@/lib/types';
 
 type PartialParseResult = Partial<ParseResult> & {
   ambiguity_reason?: unknown;
@@ -50,8 +55,27 @@ type TimeRange = {
   start: string;
 };
 
-const GROUP_KEY_SET = new Set(GROUPS.map((group) => group.key));
 const PRIORITY_SET = new Set(PRIORITIES);
+const CHINESE_NUMBER_MAP: Record<string, number> = {
+  '\u4e00': 1,
+  '\u4e03': 7,
+  '\u4e09': 3,
+  '\u4e24': 2,
+  '\u4fe9': 2,
+  '\u4e5d': 9,
+  '\u4e8c': 2,
+  '\u4e94': 5,
+  '\u516b': 8,
+  '\u516d': 6,
+  '\u5341': 10,
+  '\u56db': 4,
+  '\u96f6': 0,
+  '\u3007': 0,
+};
+const CHINESE_LOCATION_BOUNDARY =
+  '(?:\\u89c1(?:\\u9762)?|\\u96c6\\u5408|\\u4f1a\\u5408|\\u5f00(?:\\u7ec4)?\\u4f1a|\\u7ec4\\u4f1a|\\u4e0a\\u8bfe|\\u8ba8\\u8bba|\\u5403\\u996d|\\u5c31\\u8bca|\\u953b\\u70bc|\\u6c47\\u62a5|\\u78b0\\u5934|\\u590d\\u4e60|\\u5199|\\u505a|\\u53c2\\u52a0|\\u770b|\\u804a|\\u7ea6|\\u62dc\\u8bbf|\\u63d0\\u4ea4|\\u5904\\u7406|\\u5b8c\\u6210|\\u5f00\\u59cb|\\u7ee7\\u7eed|\\u8ddf|\\u548c|\\u7ed9|\\u5411|$)';
+const ENGLISH_LOCATION_BOUNDARY =
+  '(?:for|with|to|meeting|meet|discuss|review|study|call|class|lecture|presentation|doctor|dentist|work(?:ing)?|shopping|dinner|lunch|breakfast|$)';
 
 const EN_WEEKDAY_TO_INDEX: Record<string, number> = {
   fri: 5,
@@ -94,20 +118,6 @@ function parseJson<T>(content: string | null | undefined) {
   }
 }
 
-function isIsoDate(value: unknown) {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function isIsoDateTime(value: unknown) {
-  return typeof value === 'string' && !Number.isNaN(new Date(value).getTime());
-}
-
-function sanitizeGroup(value: unknown): GroupKey {
-  return typeof value === 'string' && GROUP_KEY_SET.has(value as GroupKey)
-    ? (value as GroupKey)
-    : 'other';
-}
-
 function sanitizePriority(value: unknown): Priority {
   return typeof value === 'string' && PRIORITY_SET.has(value as Priority)
     ? (value as Priority)
@@ -129,11 +139,8 @@ function sanitizeMinutes(value: unknown, fallback: number | null) {
   return fallback;
 }
 
-function titleFromText(text: string) {
-  return text
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
+function normalizeSpacing(text: string) {
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 function locationFromMatch(value: string | undefined) {
@@ -141,22 +148,197 @@ function locationFromMatch(value: string | undefined) {
     return '';
   }
 
-  return value
-    .replace(/\s+/g, ' ')
+  return normalizeSpacing(value)
     .trim()
     .replace(/^(the\s+)/i, '')
+    .replace(/^(?:from\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\s+(?:at|in)\s+/i, '')
+    .replace(
+      /^(?:today|tomorrow|day after tomorrow|tonight|this evening|next week|this week|next month|this month)\s+/i,
+      ''
+    )
+    .replace(
+      /\b(?:from\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*(?:to|until|through|-|\u2013)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?\b/gi,
+      ' '
+    )
+    .replace(
+      /\b(?:today|tomorrow|day after tomorrow|tonight|this evening|next|this|next week|this week|next month|this month|monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thu|friday|fri|saturday|sat|sunday|sun)\b/gi,
+      ' '
+    )
+    .replace(
+      /(?:\u4eca\u5929|\u660e\u5929|\u540e\u5929|\u4eca\u665a|\u4eca\u591c|\u4eca\u665a\u4e0a|\u660e\u665a|\u4e0b\u5468|\u8fd9\u5468|\u672c\u5468|\u4e0b\u4e2a?\u6708|\u8fd9\u4e2a?\u6708|\u672c\u6708)/gu,
+      ' '
+    )
+    .replace(
+      /(?:(?:\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?\d{1,2}\s*(?:(?::|\uFF1A)\d{1,2}|\u70b9(?:(\d{1,2})\u5206?)?(\u534a)?)(?:\s*(?:\u5230|\u81f3|~|\uFF5E|-)\s*(?:(?:\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?\d{1,2}\s*(?:(?::|\uFF1A)\d{1,2}|\u70b9(?:(\d{1,2})\u5206?)?(\u534a)?))?/gu,
+      ' '
+    )
+    .replace(
+      /(?:\u89c1(?:\u9762)?|\u96c6\u5408|\u4f1a\u5408|\u5f00(?:\u7ec4)?\u4f1a|\u7ec4\u4f1a|\u4e0a\u8bfe|\u8ba8\u8bba|\u5403\u996d|\u5c31\u8bca|\u953b\u70bc|\u6c47\u62a5|\u78b0\u5934|\u590d\u4e60|\u5199|doing|do|for|with|to|meeting|meet|discuss|review|study|call|class|lecture|presentation|doctor|dentist|work(?:ing)?|shopping|dinner|lunch|breakfast).*$/giu,
+      ''
+    )
+    .replace(/^[,.;:，。；：\-\s]+|[,.;:，。；：\-\s]+$/gu, '')
+    .replace(/\b(?:at|in|on|from|to|for|with)\b\s*$/i, '')
     .slice(0, 120);
 }
 
-function inferLocation(text: string) {
-  const chineseMatch = text.match(
-    /\u5728([^,\u3002\uFF0C\uFF1B;\n]+?)(?:\u89c1\u9762|\u96c6\u5408|\u4f1a\u5408|\u5f00\u4f1a|\u4e0a\u8bfe|\u8ba8\u8bba|\u5403\u996d|\u5c31\u8bca|\u953b\u70bc|\u6c47\u62a5|\u78b0\u5934|$)/u
+function parseChineseNumberToken(value: string) {
+  if (/^\d+$/.test(value)) {
+    return Number(value);
+  }
+
+  if (!value) {
+    return null;
+  }
+
+  if (value === '\u5341') {
+    return 10;
+  }
+
+  if (value.includes('\u5341')) {
+    const [tensToken, onesToken] = value.split('\u5341');
+    const tens = tensToken ? CHINESE_NUMBER_MAP[tensToken] : 1;
+    const ones = onesToken ? CHINESE_NUMBER_MAP[onesToken] : 0;
+
+    if (tens === undefined || ones === undefined) {
+      return null;
+    }
+
+    return tens * 10 + ones;
+  }
+
+  const digits = [...value].map((char) => CHINESE_NUMBER_MAP[char]);
+  return digits.every((digit) => digit !== undefined)
+    ? Number(digits.join(''))
+    : null;
+}
+
+function normalizeTemporalText(text: string) {
+  return text.replace(
+    /([\u96f6\u3007\u4e00\u4e8c\u4e24\u4fe9\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]{1,3})(?=\s*(?:\u70b9|\u65f6|\u6708|\u65e5|\u53f7|\u5206|(?:\u4e2a)?\s*\u534a?\s*\u5c0f\u65f6|\u5c0f\u65f6\s*\u534a))/gu,
+    (match) => {
+      const parsed = parseChineseNumberToken(match);
+      return parsed === null ? match : String(parsed);
+    }
+  );
+}
+
+function parseExplicitDurationMinutes(text: string) {
+  const normalized = normalizeTemporalText(text.toLowerCase());
+
+  const chineseHourHalfBeforeHourMatch = normalized.match(
+    /(\d{1,2})\s*(?:\u4e2a)?\s*\u534a\s*\u5c0f\u65f6/u
+  );
+  if (chineseHourHalfBeforeHourMatch) {
+    return Number(chineseHourHalfBeforeHourMatch[1]) * 60 + 30;
+  }
+
+  const chineseHourHalfMatch = normalized.match(
+    /(\d{1,2})\s*(?:\u4e2a)?\s*\u5c0f\u65f6\s*\u534a/u
+  );
+  if (chineseHourHalfMatch) {
+    return Number(chineseHourHalfMatch[1]) * 60 + 30;
+  }
+
+  if (/\u534a\s*(?:\u4e2a)?\s*\u5c0f\u65f6/u.test(normalized)) {
+    return 30;
+  }
+
+  const chineseHourMatch = normalized.match(/(\d{1,2})\s*(?:\u4e2a)?\s*\u5c0f\u65f6/u);
+  if (chineseHourMatch) {
+    return Number(chineseHourMatch[1]) * 60;
+  }
+
+  const chineseMinuteMatch = normalized.match(/(\d{1,3})\s*(?:\u5206\u949f|\u5206)\b/u);
+  if (chineseMinuteMatch) {
+    return Number(chineseMinuteMatch[1]);
+  }
+
+  const englishHourMinuteMatch = normalized.match(
+    /\bfor\s+(\d{1,2})\s*(?:hours?|hrs?)(?:\s+(\d{1,2})\s*(?:minutes?|mins?))?\b/i
+  );
+  if (englishHourMinuteMatch) {
+    return Number(englishHourMinuteMatch[1]) * 60 + Number(englishHourMinuteMatch[2] ?? '0');
+  }
+
+  const englishMinuteMatch = normalized.match(/\bfor\s+(\d{1,3})\s*(?:minutes?|mins?)\b/i);
+  if (englishMinuteMatch) {
+    return Number(englishMinuteMatch[1]);
+  }
+
+  return null;
+}
+
+function stripTemporalPhrases(text: string) {
+  const normalized = normalizeTemporalText(text);
+
+  return [
+    /\b20\d{2}-\d{2}-\d{2}\b/giu,
+    /(?:(?:\u4e0b\u5468|\u8fd9\u5468|\u672c\u5468)\s*)?(?:\u661f\u671f|\u5468|\u793c\u62dc)\s*[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u65e5\u5929]/gu,
+    /(?:\u4eca\u5929|\u660e\u5929|\u540e\u5929|\u4eca\u665a|\u4eca\u591c|\u4eca\u665a\u4e0a|\u660e\u665a)/gu,
+    /\b(?:(?:next|this)\s+)?(?:monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thu|friday|fri|saturday|sat|sunday|sun)\b/giu,
+    /\b(?:today|tomorrow|day after tomorrow|tonight|this evening)\b/giu,
+    /(?:(?:\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?\d{1,2}\s*(?:(?::|\uFF1A)\d{1,2}|(?:\u70b9(?:(\d{1,2})\u5206?)?(\u534a)?))(?:\s*(?:\u5230|\u81f3|~|\uFF5E|-)\s*(?:(?:\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?\d{1,2}\s*(?:(?::|\uFF1A)\d{1,2}|(?:\u70b9(?:(\d{1,2})\u5206?)?(\u534a)?)))?/gu,
+    /\b(?:from\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\s*(?:to|until|through|-|\u2013)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/giu,
+    /\b(?:from\s+)?(?:[01]?\d|2[0-3]):[0-5]\d\s*(?:to|until|through|-|\u2013)\s*(?:[01]?\d|2[0-3]):[0-5]\d\b/giu,
+    /\b(?:for\s+\d{1,3}\s*(?:minutes?|mins?|hours?|hrs?))\b/giu,
+    /(?:\d{1,2}\s*(?:\u4e2a)?\s*\u534a\s*\u5c0f\u65f6|\d{1,2}\s*(?:\u4e2a)?\s*\u5c0f\u65f6\s*\u534a|\u534a\s*(?:\u4e2a)?\s*\u5c0f\u65f6|\d{1,3}\s*(?:\u4e2a)?\s*\u5c0f\u65f6|\d{1,3}\s*(?:\u5206\u949f|\u5206))/gu,
+  ].reduce((current, pattern) => current.replace(pattern, ' '), normalized)
+    .replace(/^(?:\u4e0b|\u4e0a)\s+/u, ' ');
+}
+
+function stripLocationPhrases(text: string) {
+  return text
+    .replace(
+      new RegExp(`\\u5728\\s*([^,\\u3002\\uFF0C\\uFF1B;\\n]+?)(?=${CHINESE_LOCATION_BOUNDARY})`, 'gu'),
+      ' '
+    )
+    .replace(
+      /\bat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\s+in\s+([^,.;\n]+?)(?=(?:\s+for|\s+with|[,.;\n]|$))/gi,
+      ' '
+    )
+    .replace(
+      new RegExp(`\\b(?:at|in)\\s+([^,.;\\n]+?)(?=(?:\\s+${ENGLISH_LOCATION_BOUNDARY})|[,.;\\n]|$)`, 'gi'),
+      ' '
+    );
+}
+
+export function titleFromText(text: string) {
+  const stripped = normalizeSpacing(
+    stripLocationPhrases(stripTemporalPhrases(text))
+      .replace(/^[,.;:，。；：\-\s]+|[,.;:，。；：\-\s]+$/gu, '')
+      .replace(
+        /^(?:\u8bf7|\u5e2e\u6211|\u5e2e\u5fd9|\u8bb0\u5f97|\u5b89\u6392|\u6211\u8981|\u6211\u60f3|\u9700\u8981|\u5c3d\u5feb|\u9a6c\u4e0a|\u7acb\u5373|please|need to|remember to|schedule|urgent|asap|immediately)\s+/iu,
+        ''
+      )
+      .replace(/\b(?:on|at|in|from|to|for|with)\b\s*$/i, '')
+  );
+
+  if (stripped) {
+    return stripped.slice(0, 120);
+  }
+
+  return normalizeSpacing(text).slice(0, 120);
+}
+
+export function inferLocation(text: string) {
+  const normalized = normalizeTemporalText(text);
+  const chineseMatch = normalized.match(
+    new RegExp(`\\u5728\\s*([^,\\u3002\\uFF0C\\uFF1B;\\n]+?)(?=${CHINESE_LOCATION_BOUNDARY})`, 'u')
   );
   if (chineseMatch) {
     return locationFromMatch(chineseMatch[1]);
   }
 
-  const englishMatch = text.match(/\b(?:at|in)\s+([^,.;\n]+?)(?:\s+(?:for|with|to)\b|$)/i);
+  const englishTimeThenLocationMatch = normalized.match(
+    /\bat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\s+in\s+([^,.;\n]+?)(?=(?:\s+for|\s+with|[,.;\n]|$))/i
+  );
+  if (englishTimeThenLocationMatch) {
+    return locationFromMatch(englishTimeThenLocationMatch[1]);
+  }
+
+  const englishMatch = normalized.match(
+    new RegExp(`\\b(?:at|in)\\s+([^,.;\\n]+?)(?=(?:\\s+${ENGLISH_LOCATION_BOUNDARY})|[,.;\\n]|$)`, 'i')
+  );
   if (englishMatch) {
     return locationFromMatch(englishMatch[1]);
   }
@@ -167,7 +349,7 @@ function inferLocation(text: string) {
 function inferGroup(text: string): GroupKey {
   const normalized = text.toLowerCase();
 
-  if (/\u8bba\u6587|\u4f5c\u4e1a|\u8003\u8bd5|study|assignment|course|class|lecture|\u5bfc\u5e08/u.test(normalized)) {
+  if (/\u8bba\u6587|\u4f5c\u4e1a|\u8003\u8bd5|study|assignment|course|class|lecture|\u5bfc\u5e08|\u590d\u4e60/u.test(normalized)) {
     return 'study';
   }
 
@@ -201,6 +383,11 @@ function inferPriority(text: string): Priority {
 }
 
 function inferEstimatedMinutes(text: string, type: 'todo' | 'event') {
+  const explicitDuration = parseExplicitDurationMinutes(text);
+  if (explicitDuration) {
+    return explicitDuration;
+  }
+
   const normalized = text.toLowerCase();
 
   if (/meeting|\u5f00\u4f1a|\u8ba8\u8bba|\u6c9f\u901a|call/u.test(normalized)) {
@@ -535,13 +722,96 @@ function parseTimeRange(text: string): TimeRange | null {
   return null;
 }
 
+function parseTimeRangeNormalized(text: string): TimeRange | null {
+  const normalized = normalizeTemporalText(text);
+  const chineseRange = normalized.match(
+    /(?:(\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?(\d{1,2})\s*(?:(?::|\uFF1A)(\d{1,2})|\u70b9(?:(\d{1,2})\u5206?)?(\u534a)?)\s*(?:\u5230|\u81f3|~|\uFF5E|-)\s*(?:(\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?(\d{1,2})\s*(?:(?::|\uFF1A)(\d{1,2})|\u70b9(?:(\d{1,2})\u5206?)?(\u534a)?)/u
+  );
+  if (chineseRange) {
+    const startPeriod = chineseRange[1] ?? null;
+    const startHour = Number(chineseRange[2]);
+    const startMinute = resolveChineseMinute(chineseRange[3], chineseRange[4], chineseRange[5]);
+    const endPeriod = chineseRange[6] ?? startPeriod;
+    const endHour = Number(chineseRange[7]);
+    const endMinute = resolveChineseMinute(chineseRange[8], chineseRange[9], chineseRange[10]);
+
+    return {
+      end: formatTime(toTwentyFourHour(endHour, endPeriod, 'chinese'), endMinute),
+      start: formatTime(toTwentyFourHour(startHour, startPeriod, 'chinese'), startMinute),
+    };
+  }
+
+  const englishRange = normalized.match(
+    /\b(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:to|until|through|-|\u2013)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i
+  );
+  if (englishRange) {
+    const startMeridiem = englishRange[3].toLowerCase();
+    const endMeridiem = (englishRange[6] ?? englishRange[3]).toLowerCase();
+
+    return {
+      end: formatTime(
+        toTwentyFourHour(Number(englishRange[4]), endMeridiem, 'english'),
+        Number(englishRange[5] ?? '0')
+      ),
+      start: formatTime(
+        toTwentyFourHour(Number(englishRange[1]), startMeridiem, 'english'),
+        Number(englishRange[2] ?? '0')
+      ),
+    };
+  }
+
+  const militaryRange = normalized.match(
+    /\b(?:from\s+)?([01]?\d|2[0-3]):([0-5]\d)\s*(?:to|until|through|-|\u2013)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i
+  );
+  if (militaryRange) {
+    return {
+      end: formatTime(Number(militaryRange[3]), Number(militaryRange[4])),
+      start: formatTime(Number(militaryRange[1]), Number(militaryRange[2])),
+    };
+  }
+
+  const chineseSingle = normalized.match(
+    /(?:(\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?(\d{1,2})\s*(?:(?::|\uFF1A)(\d{1,2})|\u70b9(?:(\d{1,2})\u5206?)?(\u534a)?)/u
+  );
+  if (chineseSingle) {
+    const hour = toTwentyFourHour(Number(chineseSingle[2]), chineseSingle[1] ?? null, 'chinese');
+    const minute = resolveChineseMinute(chineseSingle[3], chineseSingle[4], chineseSingle[5]);
+    return {
+      end: null,
+      start: formatTime(hour, minute),
+    };
+  }
+
+  const englishSingle = normalized.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (englishSingle) {
+    return {
+      end: null,
+      start: formatTime(
+        toTwentyFourHour(Number(englishSingle[1]), englishSingle[3].toLowerCase(), 'english'),
+        Number(englishSingle[2] ?? '0')
+      ),
+    };
+  }
+
+  const militarySingle = normalized.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (militarySingle) {
+    return {
+      end: null,
+      start: formatTime(Number(militarySingle[1]), Number(militarySingle[2])),
+    };
+  }
+
+  return null;
+}
+
 export function analyzeTemporalIntent(
   text: string,
   now = new Date(),
   timezone = DEFAULT_TIMEZONE
 ): TemporalIntent {
-  const dueDate = inferSpecificDate(text, now);
-  const timeRange = parseTimeRange(text);
+  const normalized = normalizeTemporalText(text);
+  const dueDate = inferSpecificDate(normalized, now);
+  const timeRange = parseTimeRangeNormalized(normalized);
 
   if (dueDate && timeRange) {
     return {
@@ -565,7 +835,7 @@ export function analyzeTemporalIntent(
     };
   }
 
-  if (containsBroadWindow(text)) {
+  if (containsBroadWindow(normalized)) {
     return {
       ambiguityReason: 'The request references a broad time window without an exact day.',
       dueDate: null,
@@ -586,8 +856,36 @@ export function analyzeTemporalIntent(
   };
 }
 
-function countMeaningfulTokens(text: string) {
-  return text.match(/[a-z0-9\u4e00-\u9fff]+/gi)?.length ?? 0;
+function reconcileTimedEventFields(
+  startAt: string | null,
+  endAt: string | null,
+  estimatedMinutes: number | null
+) {
+  const durationMinutes = getDurationMinutes(startAt, endAt);
+
+  if (durationMinutes) {
+    return {
+      endAt,
+      estimatedMinutes: durationMinutes,
+    };
+  }
+
+  const normalizedEstimatedMinutes = estimatedMinutes ?? DEFAULT_EVENT_MINUTES;
+  return {
+    endAt: startAt ? endAt ?? addMinutes(startAt, normalizedEstimatedMinutes) : endAt,
+    estimatedMinutes: normalizedEstimatedMinutes,
+  };
+}
+
+function shouldRequestConfirmationForTimedEvent(
+  temporalIntent: TemporalIntent,
+  text: string
+) {
+  return (
+    temporalIntent.kind === 'specific_day_with_time' &&
+    !temporalIntent.endAt &&
+    parseExplicitDurationMinutes(text) === null
+  );
 }
 
 function toTemporalParseResult(
@@ -601,17 +899,27 @@ function toTemporalParseResult(
     : 'todo';
   const estimatedMinutes = inferEstimatedMinutes(text, type);
   const startAt = temporalIntent.startAt;
-  const endAt =
+  const rawEndAt =
     startAt && temporalIntent.kind === 'specific_day_with_time'
       ? temporalIntent.endAt ?? addMinutes(startAt, estimatedMinutes)
       : null;
+  const timing =
+    type === 'event' && temporalIntent.kind === 'specific_day_with_time'
+      ? reconcileTimedEventFields(startAt, rawEndAt, estimatedMinutes)
+      : {
+          endAt: rawEndAt,
+          estimatedMinutes,
+        };
+  const needsConfirmation =
+    temporalIntent.needsConfirmation ||
+    shouldRequestConfirmationForTimedEvent(temporalIntent, text);
 
   return {
     temporalIntent,
     result: {
       ambiguity_reason:
         temporalIntent.ambiguityReason ??
-        (temporalIntent.needsConfirmation
+        (needsConfirmation
           ? `The time expression is ambiguous for timezone ${timezone}.`
           : null),
       confidence:
@@ -623,12 +931,12 @@ function toTemporalParseResult(
               ? 0.6
               : 0.78,
       due_date: temporalIntent.kind === 'specific_day' ? temporalIntent.dueDate : null,
-      end_at: type === 'event' ? endAt : null,
-      estimated_minutes: estimatedMinutes,
+      end_at: type === 'event' ? timing.endAt : null,
+      estimated_minutes: timing.estimatedMinutes,
       group_key: inferGroup(text),
       is_all_day: temporalIntent.kind === 'specific_day',
       location: inferLocation(text),
-      needs_confirmation: temporalIntent.needsConfirmation,
+      needs_confirmation: needsConfirmation,
       notes: '',
       priority: inferPriority(text),
       start_at: temporalIntent.kind === 'specific_day_with_time' ? startAt : null,
@@ -644,23 +952,6 @@ export function fallbackParseInput(
   now = new Date()
 ): ParseResult {
   return toTemporalParseResult(text, timezone, now).result;
-}
-
-function shouldUseParseFastPath(text: string, fallback: ParseResult, temporalIntent: TemporalIntent) {
-  if (temporalIntent.kind === 'specific_day' || temporalIntent.kind === 'specific_day_with_time') {
-    return true;
-  }
-
-  if (temporalIntent.kind === 'vague_window') {
-    return true;
-  }
-
-  if (fallback.needs_confirmation) {
-    return false;
-  }
-
-  const tokenCount = countMeaningfulTokens(text);
-  return tokenCount > 0 && tokenCount <= 12;
 }
 
 function applyTemporalIntentToResult(
@@ -694,20 +985,21 @@ function applyTemporalIntentToResult(
   }
 
   if (temporalIntent.kind === 'specific_day_with_time') {
-    const estimatedMinutes = input.estimated_minutes ?? DEFAULT_EVENT_MINUTES;
+    const timing = reconcileTimedEventFields(
+      input.start_at ?? temporalIntent.startAt,
+      input.end_at ?? temporalIntent.endAt,
+      input.estimated_minutes ?? DEFAULT_EVENT_MINUTES
+    );
     const startAt = input.start_at ?? temporalIntent.startAt;
-    const endAt =
-      input.end_at ??
-      temporalIntent.endAt ??
-      (startAt ? addMinutes(startAt, estimatedMinutes) : null);
 
     return {
       ...input,
       ambiguity_reason: null,
       due_date: null,
-      end_at: endAt,
+      end_at: timing.endAt,
+      estimated_minutes: timing.estimatedMinutes,
       is_all_day: false,
-      needs_confirmation: false,
+      needs_confirmation: input.needs_confirmation,
       start_at: startAt,
       type: 'event',
     };
@@ -735,10 +1027,16 @@ function applyTemporalIntentToResult(
   }
 
   if (input.start_at && !input.end_at) {
+    const timing = reconcileTimedEventFields(
+      input.start_at,
+      input.end_at,
+      input.estimated_minutes ?? DEFAULT_EVENT_MINUTES
+    );
     return {
       ...input,
       due_date: null,
-      end_at: addMinutes(input.start_at, input.estimated_minutes ?? DEFAULT_EVENT_MINUTES),
+      end_at: timing.endAt,
+      estimated_minutes: timing.estimatedMinutes,
       type: 'event',
     };
   }
@@ -758,56 +1056,55 @@ export function normalizeParseResult(
   const { result: fallback, temporalIntent } = toTemporalParseResult(text, timezone, now);
   const title =
     typeof payload?.title === 'string' && payload.title.trim()
-      ? payload.title.trim()
+      ? titleFromText(payload.title.trim())
       : fallback.title;
-  const type = payload?.type === 'event' || payload?.type === 'todo' ? payload.type : fallback.type;
+  const type = fallback.type;
   const estimatedMinutes = sanitizeMinutes(
     payload?.estimated_minutes,
     fallback.estimated_minutes
   );
-  const payloadStartAt = payload?.start_at;
-  const payloadEndAt = payload?.end_at;
-  const payloadDueDate = payload?.due_date;
-
-  const startAt: string | null = isIsoDateTime(payloadStartAt)
-    ? (payloadStartAt as string)
-    : fallback.start_at;
-  let endAt: string | null = isIsoDateTime(payloadEndAt)
-    ? (payloadEndAt as string)
-    : fallback.end_at;
-  const dueDate: string | null = isIsoDate(payloadDueDate)
-    ? (payloadDueDate as string)
-    : fallback.due_date;
-  const isAllDay =
-    typeof payload?.is_all_day === 'boolean' ? payload.is_all_day : fallback.is_all_day;
-
-  if (type === 'event' && !isAllDay && startAt && !endAt) {
-    endAt = addMinutes(startAt, estimatedMinutes ?? DEFAULT_EVENT_MINUTES);
-  }
+  const startAt: string | null = fallback.start_at;
+  let endAt: string | null = fallback.end_at;
+  const dueDate: string | null = fallback.due_date;
+  const isAllDay = fallback.is_all_day;
+  const timing =
+    type === 'event' && !isAllDay
+      ? reconcileTimedEventFields(startAt, endAt, estimatedMinutes)
+      : {
+          endAt,
+          estimatedMinutes,
+        };
+  endAt = timing.endAt;
+  const location =
+    typeof payload?.location === 'string'
+      ? locationFromMatch(payload.location)
+      : fallback.location;
+  const aiInferredLocation = Boolean(location && !fallback.location && typeof payload?.location === 'string');
+  const ambiguityReason =
+    typeof payload?.ambiguity_reason === 'string'
+      ? payload.ambiguity_reason.trim() || null
+      : fallback.ambiguity_reason;
 
   const candidate = {
     ambiguity_reason:
-      typeof payload?.ambiguity_reason === 'string'
-        ? payload.ambiguity_reason.trim() || null
-        : fallback.ambiguity_reason,
+      ambiguityReason ?? (aiInferredLocation ? 'Location inferred from context.' : null),
     confidence:
       typeof payload?.confidence === 'number' && Number.isFinite(payload.confidence)
         ? Math.max(0, Math.min(1, payload.confidence))
         : fallback.confidence,
     due_date: dueDate,
     end_at: endAt,
-    estimated_minutes: estimatedMinutes,
-    group_key: sanitizeGroup(payload?.group_key),
+    estimated_minutes: timing.estimatedMinutes,
+    group_key: fallback.group_key,
     is_all_day: isAllDay,
-    location:
-      typeof payload?.location === 'string' ? payload.location.trim() : fallback.location,
+    location,
     needs_confirmation:
-      typeof payload?.needs_confirmation === 'boolean'
+      (typeof payload?.needs_confirmation === 'boolean'
         ? payload.needs_confirmation
-        : fallback.needs_confirmation,
-    notes:
-      typeof payload?.notes === 'string' ? payload.notes.trim() : fallback.notes,
-    priority: sanitizePriority(payload?.priority),
+        : fallback.needs_confirmation) || aiInferredLocation,
+    notes: fallback.notes,
+    priority:
+      payload?.priority !== undefined ? sanitizePriority(payload.priority) : fallback.priority,
     start_at: startAt,
     title,
     type,
@@ -816,79 +1113,105 @@ export function normalizeParseResult(
   return applyTemporalIntentToResult(candidate, temporalIntent);
 }
 
+function buildParseAiMessages(input: {
+  locale: string;
+  now: string;
+  text: string;
+  timezone: string;
+}) {
+  const { locale, now, text, timezone } = input;
+
+  return [
+    {
+      role: 'system' as const,
+      content: `
+You are a bilingual AI planning assistant.
+Return only a JSON object with these keys:
+type, title, location, notes, group_key, priority, estimated_minutes, start_at, end_at, due_date, is_all_day, needs_confirmation, ambiguity_reason, confidence.
+
+Rules:
+- group_key must be one of: study, work, life, health, other.
+- priority must be one of: low, medium, high.
+- type must be event or todo.
+- location should contain only the place name when the user clearly provides one. Otherwise use an empty string.
+- Use ISO 8601 for start_at/end_at. Use YYYY-MM-DD for due_date.
+- If the user gives a date but no time, create an all-day event with due_date set and start_at/end_at null.
+- If the text is ambiguous like "next week", set needs_confirmation true and explain ambiguity_reason.
+- If an event has a start time but no end time, estimate estimated_minutes and derive a reasonable end_at.
+- Understand common Chinese colloquial time phrases: "明天凌晨一点半到三点半" means 01:30 to 03:30 on the referenced day.
+- Understand common Chinese duration phrases: "两个半小时", "两小时半", and "俩小时半" all mean 150 minutes.
+- If the user only gives a duration without a start time, keep start_at/end_at null and fill estimated_minutes.
+- Keep title concise. location and notes can be empty.
+- Respect locale ${locale} and timezone ${timezone}.
+- Current timestamp is ${now}.
+      `.trim(),
+    },
+    {
+      role: 'user' as const,
+      content: text,
+    },
+  ];
+}
+
+export function buildExtractedFields(
+  result: ParseResult,
+  timezone = DEFAULT_TIMEZONE
+): ParseExtractedFields {
+  return {
+    duration_minutes: result.estimated_minutes,
+    location: result.location,
+    priority: result.priority,
+    time: {
+      due_date: result.due_date,
+      end_at: result.end_at,
+      is_all_day: result.is_all_day,
+      start_at: result.start_at,
+      timezone,
+    },
+    title: result.title,
+  };
+}
+
+function buildParseResponse(
+  mode: ParseResponse['mode'],
+  result: ParseResult,
+  timezone: string
+): ParseResponse {
+  return {
+    extracted_fields: buildExtractedFields(result, timezone),
+    mode,
+    result,
+  };
+}
+
 export async function parseInputWithAi(input: {
   locale?: string;
   text: string;
   timezone?: string;
-}) {
+}): Promise<ParseResponse> {
   const { locale = 'en-US', text, timezone = DEFAULT_TIMEZONE } = input;
   const aiConfig = getAiConfig('parse');
-  const { result: fallback, temporalIntent } = toTemporalParseResult(text, timezone);
+  const { result: fallback } = toTemporalParseResult(text, timezone);
 
   if (!aiConfig.apiKey) {
-    return {
-      mode: 'fallback' as const,
-      result: fallback,
-    };
-  }
-
-  if (shouldUseParseFastPath(text, fallback, temporalIntent)) {
-    logAiJsonMetrics({
-      fastPath: true,
-      outcome: 'skip',
-      reason:
-        temporalIntent.kind === 'specific_day' || temporalIntent.kind === 'specific_day_with_time'
-          ? 'deterministic_specific_day'
-          : temporalIntent.kind === 'vague_window'
-            ? 'deterministic_vague_window'
-            : 'short_todo_fast_path',
-      task: 'parse',
-    });
-
-    return {
-      mode: 'ai' as const,
-      result: fallback,
-    };
+    return buildParseResponse('fallback', fallback, timezone);
   }
 
   const now = new Date().toISOString();
   try {
     const payload = await requestAiJson<PartialParseResult>({
-      messages: [
-        {
-          role: 'system',
-          content: `
-You are a bilingual planning parser.
-Return one JSON object only with keys:
-type,title,location,notes,group_key,priority,estimated_minutes,start_at,end_at,due_date,is_all_day,needs_confirmation,ambiguity_reason,confidence.
-Rules:
-- type: event | todo
-- group_key: study | work | life | health | other
-- priority: low | medium | high
-- start_at/end_at: ISO 8601, due_date: YYYY-MM-DD
-- If the user only gives a broad time window such as 下周, 下个月, next week, next month, this week, later, or sometime without an exact day, return type=todo.
-- If the user names an exact calendar day such as 明天, 下周一, Monday, or 2026-03-30, return type=event.
-- If the user names an exact day without a clock time, return an all-day event with due_date only and start_at/end_at null.
-- If the user names an exact day with a clock time or time range, return a timed event with start_at/end_at and set due_date to null.
-- If start_at exists and end_at is missing, infer estimated_minutes and end_at.
-- Keep title concise. location and notes may be empty.
-Locale=${locale}; Timezone=${timezone}; Now=${now}.
-          `.trim(),
-        },
-        {
-          role: 'user',
-          content: text,
-        },
-      ],
+      messages: buildParseAiMessages({
+        locale,
+        now,
+        text,
+        timezone,
+      }),
       parse: (content) => parseJson<PartialParseResult>(content),
       task: 'parse',
     });
 
     if (payload) {
-      return {
-        mode: 'ai' as const,
-        result: normalizeParseResult(payload, text, timezone),
-      };
+      return buildParseResponse('ai', normalizeParseResult(payload, text, timezone), timezone);
     }
   } catch {
     logAiJsonMetrics({
@@ -906,8 +1229,5 @@ Locale=${locale}; Timezone=${timezone}; Now=${now}.
     task: 'parse',
   });
 
-  return {
-    mode: 'fallback' as const,
-    result: fallback,
-  };
+  return buildParseResponse('fallback', fallback, timezone);
 }

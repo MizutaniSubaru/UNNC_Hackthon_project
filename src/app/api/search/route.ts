@@ -149,6 +149,29 @@ function isSummaryIntent(query: string) {
     return /我.*做了什么|发生了什么|what\s+did\s+i|what\s+happened|things\s+i\s+did/i.test(query);
 }
 
+function splitAiKeywordText(value: string) {
+    return Array.from(
+        new Set(
+            (value.toLowerCase().match(/[a-z0-9\u4e00-\u9fff]+/gi) ?? [])
+                .map((entry) => entry.trim())
+                .filter(Boolean)
+        )
+    );
+}
+
+function hasExplicitTimeHint(query: string) {
+    return [
+        /\b20\d{2}-\d{2}-\d{2}\b/i,
+        /\b(?:today|tomorrow|day after tomorrow|yesterday|tonight|this evening|last week|this week|next week|last month|this month|next month)\b/i,
+        /\b(?:(?:next|this)\s+)?(?:monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thu|friday|fri|saturday|sat|sunday|sun)\b/i,
+        /(?:\u4eca\u5929|\u660e\u5929|\u540e\u5929|\u6628\u5929|\u4eca\u665a|\u4eca\u591c|\u660e\u665a|\u4e0a\u5468|\u4e0b\u5468|\u8fd9\u5468|\u672c\u5468|\u4e0a\u4e2a?\u6708|\u4e0b\u4e2a?\u6708|\u8fd9\u4e2a?\u6708|\u672c\u6708)/u,
+        /(?:(?:\u4e0a\u5468|\u4e0b\u5468|\u8fd9\u5468|\u672c\u5468)\s*)?(?:\u661f\u671f|\u5468|\u793c\u62dc)\s*[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u65e5\u5929]/u,
+        /20\d{2}\s*\u5e74\s*\d{1,2}\s*\u6708\s*\d{1,2}\s*(?:\u65e5|\u53f7)?/u,
+        /\d{1,2}\s*\u6708\s*\d{1,2}\s*(?:\u65e5|\u53f7)?/u,
+        /\b\d{1,2}\s*\/\s*\d{1,2}\b/,
+    ].some((pattern) => pattern.test(query));
+}
+
 function extractKeywords(query: string) {
     const compact = query.trim().toLowerCase();
     if (!compact) {
@@ -548,10 +571,21 @@ function normalizeAiIntent(payload: unknown): AiIntent {
     };
 
     const keywords = Array.isArray(source.keywords)
-        ? source.keywords.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim().toLowerCase()).filter(Boolean)
-        : [];
+        ? Array.from(
+            new Set(
+                source.keywords
+                    .flatMap((entry) => typeof entry === 'string' ? splitAiKeywordText(entry) : [])
+                    .filter(Boolean)
+            )
+        )
+        : typeof source.keywords === 'string'
+            ? splitAiKeywordText(source.keywords)
+            : [];
 
-    const type = source.type === 'event' || source.type === 'todo' ? source.type : 'all';
+    const type =
+        source.type === 'all' || source.type === 'event' || source.type === 'todo'
+            ? source.type
+            : 'all';
 
     return {
         date_end: typeof source.date_end === 'string' ? source.date_end : null,
@@ -574,10 +608,11 @@ async function inferIntentWithAi(input: {
                 content: `
 You parse search intent.
 Return one JSON object only with keys: keywords, type, date_start, date_end.
-- keywords: concise search terms
+- keywords: concise search terms as either a string array or a single string
 - type: all | event | todo
 - date_start/date_end: YYYY-MM-DD or null
-- For broad summary queries, prefer a date range and keep keywords empty.
+- Only set date_start/date_end when the user explicitly mentions a date, day, or time window.
+- For broad summary queries without an explicit time hint, keep date_start/date_end null so the app can search across full history.
 Locale=${locale}; Timezone=${timezone}.
                 `.trim(),
             },
@@ -724,8 +759,9 @@ export async function POST(request: Request) {
         let effectiveRange = ruleRange;
         let effectiveKeywords = keywordList;
         let fallbackToKeyword = false;
+        const allowAiDateRange = !ruleRange && hasExplicitTimeHint(query);
 
-        if (effectiveRange && isSummaryIntent(query)) {
+        if (isSummaryIntent(query)) {
             effectiveKeywords = [];
         }
 
@@ -739,7 +775,7 @@ export async function POST(request: Request) {
 
                     const aiStart = parseYmd(aiIntent.date_start);
                     const aiEnd = parseYmd(aiIntent.date_end);
-                    if (aiStart && aiEnd && !ruleRange) {
+                    if (aiStart && aiEnd && allowAiDateRange) {
                         effectiveRange = {
                             end: endOfDay(aiEnd),
                             label: locale.startsWith('zh') ? 'AI 解析时间范围' : 'AI inferred time range',
@@ -749,7 +785,7 @@ export async function POST(request: Request) {
 
                     if (aiIntent.keywords.length > 0) {
                         effectiveKeywords = aiIntent.keywords;
-                    } else if (effectiveRange && isSummaryIntent(query)) {
+                    } else if (isSummaryIntent(query)) {
                         effectiveKeywords = [];
                     }
                 }

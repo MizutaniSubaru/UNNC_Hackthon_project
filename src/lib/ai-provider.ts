@@ -3,7 +3,8 @@ import type { APIError } from 'openai/error';
 
 const DEFAULT_MINIMAX_BASE_URL = 'https://api.minimaxi.com/v1';
 const DEFAULT_MINIMAX_MODEL = 'MiniMax-M2.7';
-const DEFAULT_JSON_TASK_MODEL = 'MiniMax-M2.7-highspeed';
+const DEFAULT_JSON_TASK_MODEL = DEFAULT_MINIMAX_MODEL;
+const DEFAULT_SEARCH_TASK_MODEL = 'MiniMax-M2.5';
 const MINIMAX_MODEL_FALLBACKS = [
   'MiniMax-M2.7',
   'MiniMax-M2.7-highspeed',
@@ -24,13 +25,13 @@ const TASK_MODEL_ENV_KEYS = {
 const TASK_DEFAULT_MODELS = {
   default: DEFAULT_MINIMAX_MODEL,
   parse: DEFAULT_JSON_TASK_MODEL,
-  'search-intent': DEFAULT_JSON_TASK_MODEL,
-  'search-rerank': DEFAULT_JSON_TASK_MODEL,
+  'search-intent': DEFAULT_SEARCH_TASK_MODEL,
+  'search-rerank': DEFAULT_SEARCH_TASK_MODEL,
 } as const;
 
 const TASK_MAX_COMPLETION_TOKENS = {
-  parse: 256,
-  'search-intent': 128,
+  parse: 512,
+  'search-intent': 384,
   'search-rerank': 768,
 } as const;
 
@@ -79,14 +80,34 @@ function getConfiguredGlobalModel() {
   return process.env.MINIMAX_MODEL || process.env.OPENAI_MODEL;
 }
 
+function removeHighspeedSuffix(model: string | undefined) {
+  return typeof model === 'string' ? model.replace(/-highspeed$/i, '') : model;
+}
+
 function readPositiveInt(value: string | undefined, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
 }
 
+function isSearchTask(task: AiTask) {
+  return task === 'search-intent' || task === 'search-rerank';
+}
+
 function getTaskModel(task: AiTask) {
   if (task === 'default') {
     return getConfiguredGlobalModel() || TASK_DEFAULT_MODELS.default;
+  }
+
+  if (task === 'parse') {
+    return (
+      removeHighspeedSuffix(process.env[TASK_MODEL_ENV_KEYS[task]]) ||
+      removeHighspeedSuffix(getConfiguredGlobalModel()) ||
+      TASK_DEFAULT_MODELS[task]
+    );
+  }
+
+  if (isSearchTask(task)) {
+    return process.env[TASK_MODEL_ENV_KEYS[task]] || TASK_DEFAULT_MODELS[task];
   }
 
   return (
@@ -99,6 +120,22 @@ function getTaskModel(task: AiTask) {
 function getTaskFallbacks(task: AiTask) {
   if (task === 'default') {
     return [...MINIMAX_MODEL_FALLBACKS];
+  }
+
+  if (task === 'parse') {
+    return [
+      TASK_DEFAULT_MODELS[task],
+      ...MINIMAX_MODEL_FALLBACKS
+        .filter((model) => !model.includes('highspeed'))
+        .map((model) => removeHighspeedSuffix(model) as string),
+      ];
+  }
+
+  if (isSearchTask(task)) {
+    const standardModels = MINIMAX_MODEL_FALLBACKS.filter((model) => !model.includes('highspeed'));
+    const highspeedModels = MINIMAX_MODEL_FALLBACKS.filter((model) => model.includes('highspeed'));
+
+    return [TASK_DEFAULT_MODELS[task], ...standardModels, ...highspeedModels];
   }
 
   return [TASK_DEFAULT_MODELS[task], ...MINIMAX_MODEL_FALLBACKS];
@@ -122,11 +159,17 @@ export function getAiConfig(task: AiTask = 'default'): AiConfig {
     process.env.MINIMAX_BASE_URL || process.env.OPENAI_BASE_URL || DEFAULT_MINIMAX_BASE_URL;
   const configuredGlobalModel = getConfiguredGlobalModel();
   const model = getTaskModel(task);
+  const candidateModels =
+    task === 'parse'
+      ? uniqueNonEmpty([model, ...getTaskFallbacks(task)])
+      : isSearchTask(task)
+        ? uniqueNonEmpty([model, ...getTaskFallbacks(task), configuredGlobalModel || ''])
+      : uniqueNonEmpty([model, configuredGlobalModel || '', ...getTaskFallbacks(task)]);
 
   return {
     apiKey,
     baseURL,
-    candidateModels: uniqueNonEmpty([model, configuredGlobalModel || '', ...getTaskFallbacks(task)]),
+    candidateModels,
     model,
     task,
   };
@@ -152,7 +195,7 @@ export function isRetryableModelError(error: unknown) {
 
   return (
     apiError?.status === 404 ||
-    /not found the model|permission denied|unknown model|invalid model|model.*not.*found/i.test(
+    /not found the model|permission denied|unknown model|invalid model|model.*not.*found|not support model|not supported|unsupported model/i.test(
       message
     )
   );
