@@ -3,7 +3,6 @@
 import {
   startTransition,
   useCallback,
-  useDeferredValue,
   useEffect,
   useState,
 } from 'react';
@@ -19,17 +18,32 @@ import {
 } from '@/lib/editor-timing';
 import { createLaunchOrigin } from '@/lib/launch-origin';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
-import { formatDateTimeLabel, sortItems } from '@/lib/time';
+import {
+  formatDateTimeLabel,
+  isEndAfterStart,
+  sortItems,
+  toDateInputValue,
+  toDateTimeInputValue,
+} from '@/lib/time';
+import {
+  createDefaultTodoRailFilters,
+  filterAndSortTodoRailItems,
+  getDefaultGroupKeys,
+  getDefaultPriorities,
+} from '@/lib/todo-rail';
 import type {
   ActivityAction,
   ActivityLog,
+  GroupKey,
   Item,
   LaunchOrigin,
   ParseResult,
+  Priority,
   SearchHit,
   SearchMode,
   SearchResponse,
 } from '@/lib/types';
+import type { TodoRailFilters, TodoSortMode } from '@/lib/todo-rail';
 
 type ConfirmationModalProps = {
   busy: boolean;
@@ -46,18 +60,27 @@ type ConfirmationModalProps = {
 
 type TodoRailProps = {
   copy: typeof COPY.en;
-  groupFilter: string;
+  isFilterOpen: boolean;
   items: Item[];
   locale: string;
+  onApplyFilters: (filters: TodoRailFilters) => void;
+  onCloseFilter: () => void;
+  onOpenFilter: () => void;
   onQuickStatus: (item: Item, status: string) => void;
   onSelectItem: (item: Item, launchOrigin: LaunchOrigin | null) => void;
-  priorityFilter: string;
-  search: string;
-  setGroupFilter: (value: string) => void;
-  setPriorityFilter: (value: string) => void;
-  setSearch: (value: string) => void;
-  setStatusFilter: (value: string) => void;
-  statusFilter: string;
+  selectedGroupKeys: GroupKey[];
+  selectedPriorities: Priority[];
+  todoSortMode: TodoSortMode;
+};
+
+type TodoFilterModalProps = {
+  copy: typeof COPY.en;
+  locale: string;
+  onApply: (filters: TodoRailFilters) => void;
+  onDismiss: () => void;
+  selectedGroupKeys: GroupKey[];
+  selectedPriorities: Priority[];
+  sortMode: TodoSortMode;
 };
 
 type HistoryTimelineProps = {
@@ -94,6 +117,12 @@ function resolveLocale() {
 
 function resolveCopy(locale: string) {
   return locale.startsWith('zh') ? COPY.zh : COPY.en;
+}
+
+function toggleSelection<T extends string>(current: T[], value: T) {
+  return current.includes(value)
+    ? current.filter((entry) => entry !== value)
+    : [...current, value];
 }
 
 function toIsoOrNull(value: string | null | undefined) {
@@ -374,62 +403,230 @@ function ConfirmationModal({
   );
 }
 
+function TodoFilterModal({
+  copy,
+  locale,
+  onApply,
+  onDismiss,
+  selectedGroupKeys,
+  selectedPriorities,
+  sortMode,
+}: TodoFilterModalProps) {
+  const [draftSortMode, setDraftSortMode] = useState<TodoSortMode>(sortMode);
+  const [draftSelectedGroupKeys, setDraftSelectedGroupKeys] = useState<GroupKey[]>(selectedGroupKeys);
+  const [draftSelectedPriorities, setDraftSelectedPriorities] = useState<Priority[]>(selectedPriorities);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onDismiss();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onDismiss]);
+
+  function handleReset() {
+    const defaults = createDefaultTodoRailFilters();
+    setDraftSortMode(defaults.sortMode);
+    setDraftSelectedGroupKeys(defaults.selectedGroupKeys);
+    setDraftSelectedPriorities(defaults.selectedPriorities);
+  }
+
+  function handleApply() {
+    onApply({
+      selectedGroupKeys: draftSelectedGroupKeys,
+      selectedPriorities: draftSelectedPriorities,
+      sortMode: draftSortMode,
+    });
+  }
+
+  return (
+    <>
+      <button
+        aria-label={copy.actions.close}
+        className="planner-modal__overlay is-visible"
+        onClick={onDismiss}
+        type="button"
+      />
+      <div
+        aria-labelledby="todo-filter-dialog-title"
+        aria-modal="true"
+        className="planner-modal"
+        role="dialog"
+      >
+        <section className="planner-panel planner-panel--modal planner-panel--todo-filter-modal planner-panel--modal-pop">
+          <div className="planner-panel__header">
+            <div>
+              <p className="planner-panel__eyebrow">{copy.actions.filter}</p>
+              <h2 className="planner-panel__title" id="todo-filter-dialog-title">
+                {copy.sections.todo}
+              </h2>
+            </div>
+          </div>
+
+          <div className="todo-filter-modal__content">
+            <section className="todo-filter-modal__section">
+              <p className="todo-filter-modal__section-label">{copy.todoFilters.title}</p>
+              <div className="todo-filter-modal__option-grid">
+                {(
+                  [
+                    ['time', copy.todoFilters.byTime],
+                    ['group', copy.todoFilters.byGroup],
+                    ['priority', copy.todoFilters.byPriority],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    aria-pressed={draftSortMode === mode}
+                    className={`editor-toggle-button todo-filter-modal__option${
+                      draftSortMode === mode ? ' is-active' : ''
+                    }`}
+                    key={mode}
+                    onClick={() => setDraftSortMode(mode)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {draftSortMode === 'group' ? (
+              <section className="todo-filter-modal__section">
+                <p className="todo-filter-modal__section-label">{copy.labels.group}</p>
+                <div className="todo-filter-modal__option-grid">
+                  {GROUPS.map((group) => {
+                    const isActive = draftSelectedGroupKeys.includes(group.key);
+
+                    return (
+                      <button
+                        aria-pressed={isActive}
+                        className={`editor-toggle-button todo-filter-modal__option${
+                          isActive ? ' is-active' : ''
+                        }`}
+                        key={group.key}
+                        onClick={() =>
+                          setDraftSelectedGroupKeys((current) =>
+                            toggleSelection(current, group.key)
+                          )
+                        }
+                        type="button"
+                      >
+                        {locale.startsWith('zh') ? group.labelZh : group.labelEn}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            {draftSortMode === 'priority' ? (
+              <section className="todo-filter-modal__section">
+                <p className="todo-filter-modal__section-label">{copy.labels.priority}</p>
+                <div className="todo-filter-modal__option-grid">
+                  {PRIORITIES.map((priority) => {
+                    const isActive = draftSelectedPriorities.includes(priority);
+
+                    return (
+                      <button
+                        aria-pressed={isActive}
+                        className={`editor-toggle-button todo-filter-modal__option${
+                          isActive ? ' is-active' : ''
+                        }`}
+                        key={priority}
+                        onClick={() =>
+                          setDraftSelectedPriorities((current) =>
+                            toggleSelection(current, priority)
+                          )
+                        }
+                        type="button"
+                      >
+                        {priority}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+          </div>
+
+          <div className="editor-actions todo-filter-modal__actions">
+            <button
+              className="planner-button planner-button--ghost"
+              onClick={handleReset}
+              type="button"
+            >
+              {copy.actions.resetFilters}
+            </button>
+            <button
+              className="planner-button planner-button--ghost"
+              onClick={onDismiss}
+              type="button"
+            >
+              {copy.actions.close}
+            </button>
+            <button className="planner-button" onClick={handleApply} type="button">
+              {copy.actions.apply}
+            </button>
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
 function TodoRail({
   copy,
-  groupFilter,
+  isFilterOpen,
   items,
   locale,
+  onApplyFilters,
+  onCloseFilter,
+  onOpenFilter,
   onQuickStatus,
   onSelectItem,
-  priorityFilter,
-  search,
-  setGroupFilter,
-  setPriorityFilter,
-  setSearch,
-  setStatusFilter,
-  statusFilter,
+  selectedGroupKeys,
+  selectedPriorities,
+  todoSortMode,
 }: TodoRailProps) {
   return (
     <section className="planner-panel planner-panel--todo">
       <div className="planner-panel__header">
         <div>
           <p className="planner-panel__eyebrow">{copy.sections.todo}</p>
-          <h2 className="planner-panel__title">
-            {locale.startsWith('zh') ? '待办筛选与执行' : 'To-do filter rail'}
-          </h2>
+          <h2 className="planner-panel__title">{copy.todoFilters.title}</h2>
         </div>
+        <button
+          className="planner-button planner-button--ghost todo-rail__filter-button"
+          onClick={onOpenFilter}
+          type="button"
+        >
+          {copy.actions.filter}
+        </button>
       </div>
 
-      <div className="todo-filters">
-        <input
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={locale.startsWith('zh') ? '搜索标题或备注' : 'Search title or notes'}
-          value={search}
+      {isFilterOpen ? (
+        <TodoFilterModal
+          copy={copy}
+          key={`${todoSortMode}:${selectedGroupKeys.join(',')}:${selectedPriorities.join(',')}`}
+          locale={locale}
+          onApply={onApplyFilters}
+          onDismiss={onCloseFilter}
+          selectedGroupKeys={selectedGroupKeys}
+          selectedPriorities={selectedPriorities}
+          sortMode={todoSortMode}
         />
-        <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
-          <option value="all">{locale.startsWith('zh') ? '全部状态' : 'All statuses'}</option>
-          <option value="pending">pending</option>
-        </select>
-        <select onChange={(event) => setGroupFilter(event.target.value)} value={groupFilter}>
-          <option value="all">{locale.startsWith('zh') ? '全部分组' : 'All groups'}</option>
-          {GROUPS.map((group) => (
-            <option key={group.key} value={group.key}>
-              {locale.startsWith('zh') ? group.labelZh : group.labelEn}
-            </option>
-          ))}
-        </select>
-        <select
-          onChange={(event) => setPriorityFilter(event.target.value)}
-          value={priorityFilter}
-        >
-          <option value="all">{locale.startsWith('zh') ? '全部优先级' : 'All priorities'}</option>
-          {PRIORITIES.map((priority) => (
-            <option key={priority} value={priority}>
-              {priority}
-            </option>
-          ))}
-        </select>
-      </div>
+      ) : null}
 
       <div className="todo-list">
         {items.length === 0 ? (
@@ -811,10 +1008,14 @@ export function PlannerApp() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [focusDate, setFocusDate] = useState(() => new Date());
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [groupFilter, setGroupFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [isTodoFilterOpen, setIsTodoFilterOpen] = useState(false);
+  const [todoSortMode, setTodoSortMode] = useState<TodoSortMode>('time');
+  const [selectedGroupKeys, setSelectedGroupKeys] = useState<GroupKey[]>(() =>
+    getDefaultGroupKeys()
+  );
+  const [selectedPriorities, setSelectedPriorities] = useState<Priority[]>(() =>
+    getDefaultPriorities()
+  );
   const [historyBusy, setHistoryBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState<SearchMode>('keyword');
@@ -823,7 +1024,6 @@ export function PlannerApp() {
   const [searchRangeLabel, setSearchRangeLabel] = useState<string | null>(null);
   const [searchFallback, setSearchFallback] = useState(false);
 
-  const deferredSearch = useDeferredValue(search);
   const copy = resolveCopy(locale);
 
   useEffect(() => {
@@ -1168,33 +1368,11 @@ export function PlannerApp() {
     (item) => item.type === 'event' || (item.is_all_day && Boolean(item.due_date))
   );
 
-  const filteredTodos = sortItems(
-    activeItems.filter((item) => {
-      if (item.type !== 'todo') {
-        return false;
-      }
-
-      const haystack = `${item.title} ${item.location ?? ''} ${item.notes ?? ''}`.toLowerCase();
-
-      if (deferredSearch.trim() && !haystack.includes(deferredSearch.toLowerCase())) {
-        return false;
-      }
-
-      if (statusFilter !== 'all' && item.status !== statusFilter) {
-        return false;
-      }
-
-      if (groupFilter !== 'all' && item.group_key !== groupFilter) {
-        return false;
-      }
-
-      if (priorityFilter !== 'all' && item.priority !== priorityFilter) {
-        return false;
-      }
-
-      return true;
-    })
-  );
+  const filteredTodos = filterAndSortTodoRailItems(activeItems, {
+    selectedGroupKeys,
+    selectedPriorities,
+    sortMode: todoSortMode,
+  });
 
   if (!configured || !supabase) {
     return <EmptyWorkspace copy={copy} />;
@@ -1302,18 +1480,24 @@ export function PlannerApp() {
         />
         <TodoRail
           copy={copy}
-          groupFilter={groupFilter}
+          isFilterOpen={isTodoFilterOpen}
           items={filteredTodos}
           locale={locale}
+          onApplyFilters={(filters) => {
+            startTransition(() => {
+              setTodoSortMode(filters.sortMode);
+              setSelectedGroupKeys(filters.selectedGroupKeys);
+              setSelectedPriorities(filters.selectedPriorities);
+            });
+            setIsTodoFilterOpen(false);
+          }}
+          onCloseFilter={() => setIsTodoFilterOpen(false)}
+          onOpenFilter={() => setIsTodoFilterOpen(true)}
           onQuickStatus={(item, status) => void handleQuickStatus(item, status)}
           onSelectItem={handleOpenItem}
-          priorityFilter={priorityFilter}
-          search={search}
-          setGroupFilter={setGroupFilter}
-          setPriorityFilter={setPriorityFilter}
-          setSearch={setSearch}
-          setStatusFilter={setStatusFilter}
-          statusFilter={statusFilter}
+          selectedGroupKeys={selectedGroupKeys}
+          selectedPriorities={selectedPriorities}
+          todoSortMode={todoSortMode}
         />
         <HistoryTimeline
           busy={busy || historyBusy}

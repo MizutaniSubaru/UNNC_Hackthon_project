@@ -4,10 +4,14 @@ export const COPY: Record<'en' | 'zh', LocaleCopy> = {
   en: {
     actions: {
       analyze: 'Analyze Request',
+      apply: 'Apply',
       cancel: 'Reset',
+      close: 'Cancel',
       create: 'Create Item',
       delete: 'Delete',
+      filter: 'Filter',
       refresh: 'Refresh',
+      resetFilters: 'Reset filters',
       save: 'Save Changes',
     },
     badges: {
@@ -38,14 +42,24 @@ export const COPY: Record<'en' | 'zh', LocaleCopy> = {
       intake: 'Natural-language intake',
       todo: 'To-do rail',
     },
+    todoFilters: {
+      byGroup: 'By group',
+      byPriority: 'By priority',
+      byTime: 'By time',
+      title: 'Filter to-dos',
+    },
   },
   zh: {
     actions: {
       analyze: '\u89e3\u6790\u4e8b\u9879',
+      apply: '\u5e94\u7528',
       cancel: '\u6e05\u7a7a',
+      close: '\u53d6\u6d88',
       create: '\u521b\u5efa\u4e8b\u9879',
       delete: '\u5220\u9664',
+      filter: '\u7b5b\u9009',
       refresh: '\u5237\u65b0',
+      resetFilters: '\u91cd\u7f6e\u7b5b\u9009',
       save: '\u4fdd\u5b58\u4fee\u6539',
     },
     badges: {
@@ -75,6 +89,12 @@ export const COPY: Record<'en' | 'zh', LocaleCopy> = {
       history: '\u64cd\u4f5c\u65f6\u95f4\u7ebf',
       intake: '\u81ea\u7136\u8bed\u8a00\u5f55\u5165',
       todo: '\u5f85\u529e\u5217\u8868',
+    },
+    todoFilters: {
+      byGroup: '\u6309\u5206\u7ec4',
+      byPriority: '\u6309\u4f18\u5148\u7ea7',
+      byTime: '\u6309\u65f6\u95f4',
+      title: '\u7b5b\u9009\u5f85\u529e',
     },
   },
 };

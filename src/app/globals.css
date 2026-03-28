@@ -332,9 +332,7 @@ button:disabled {
 .composer-textarea,
 .field input,
 .field select,
-.field textarea,
-.todo-filters input,
-.todo-filters select {
+.field textarea {
   width: 100%;
   border: 1px solid rgba(20, 33, 61, 0.16);
   border-radius: 22px;
@@ -1428,10 +1426,53 @@ button:disabled {
   color: var(--ink-soft);
 }
 
-.todo-filters {
+.todo-rail__filter-button {
+  white-space: nowrap;
+}
+
+.planner-panel--todo-filter-modal {
+  width: min(680px, 100%);
+  background:
+    radial-gradient(circle at top right, rgba(79, 124, 255, 0.14), transparent 28%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(255, 249, 239, 0.82)),
+    linear-gradient(transparent 96%, rgba(20, 33, 61, 0.06) 96%);
+}
+
+.todo-filter-modal__content {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.todo-filter-modal__section {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.todo-filter-modal__section-label {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.todo-filter-modal__option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.todo-filter-modal__option {
+  min-height: 44px;
+}
+
+.todo-filter-modal__actions {
+  justify-content: flex-end;
 }
 
 .search-panel__controls {
@@ -1758,7 +1799,7 @@ button:disabled {
   .planner-panel__header,
   .status-strip,
   .search-panel__controls,
-  .todo-filters,
+  .todo-filter-modal__option-grid,
   .editor-grid,
   .editor-timing-row {
     grid-template-columns: 1fr;
