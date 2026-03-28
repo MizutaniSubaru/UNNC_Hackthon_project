@@ -99,8 +99,8 @@ export function PlannerEditorFields<T extends EditorFieldsValue>({
       <label className="field">
         <span>{copy.labels.group}</span>
         <select
-            onChange={(event) => onChange({ ...value, group_key: event.target.value as GroupKey })}
-            value={value.group_key}
+          onChange={(event) => onChange({ ...value, group_key: event.target.value as GroupKey })}
+          value={value.group_key}
         >
           {GROUPS.map((group) => (
             <option key={group.key} value={group.key}>
@@ -113,8 +113,8 @@ export function PlannerEditorFields<T extends EditorFieldsValue>({
       <label className="field">
         <span>{copy.labels.priority}</span>
         <select
-            onChange={(event) => onChange({ ...value, priority: event.target.value as Priority })}
-            value={value.priority}
+          onChange={(event) => onChange({ ...value, priority: event.target.value as Priority })}
+          value={value.priority}
         >
           {PRIORITIES.map((priority) => (
             <option key={priority} value={priority}>

@@ -441,7 +441,7 @@ export function CalendarFull({
             {isChinese ? '\u65e5\u5386\u89c6\u56fe\uff08FullCalendar\uff09' : 'Calendar view (FullCalendar)'}
           </p>
         </div>
-        <CalendarExportButton items={items} />
+        <CalendarExportButton items={items} locale={locale} />
       </div>
 
       <div className="planner-fullcalendar">

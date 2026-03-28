@@ -95,33 +95,33 @@ export function DateTimeWheelPicker({
   const isChinese = locale.startsWith('zh');
   const copy = isChinese
     ? {
-        cancel: '\u53d6\u6d88',
-        confirm: '\u786e\u8ba4',
-        date: '\u65e5\u671f',
-        day: '\u65e5',
-        hour: '\u65f6',
-        invalidRange: '\u65f6\u95f4\u5fc5\u987b\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4\u3002',
-        minute: '\u5206',
-        month: '\u6708',
-        pickDate: '\u9009\u62e9\u65e5\u671f',
-        pickTime: '\u9009\u62e9\u65f6\u95f4',
-        time: '\u65f6\u95f4',
-        year: '\u5e74',
-      }
+      cancel: '\u53d6\u6d88',
+      confirm: '\u786e\u8ba4',
+      date: '\u65e5\u671f',
+      day: '\u65e5',
+      hour: '\u65f6',
+      invalidRange: '\u65f6\u95f4\u5fc5\u987b\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4\u3002',
+      minute: '\u5206',
+      month: '\u6708',
+      pickDate: '\u9009\u62e9\u65e5\u671f',
+      pickTime: '\u9009\u62e9\u65f6\u95f4',
+      time: '\u65f6\u95f4',
+      year: '\u5e74',
+    }
     : {
-        cancel: 'Cancel',
-        confirm: 'Confirm',
-        date: 'Date',
-        day: 'Day',
-        hour: 'Hour',
-        invalidRange: 'Time must be later than start time.',
-        minute: 'Minute',
-        month: 'Month',
-        pickDate: 'Pick Date',
-        pickTime: 'Pick Time',
-        time: 'Time',
-        year: 'Year',
-      };
+      cancel: 'Cancel',
+      confirm: 'Confirm',
+      date: 'Date',
+      day: 'Day',
+      hour: 'Hour',
+      invalidRange: 'Time must be later than start time.',
+      minute: 'Minute',
+      month: 'Month',
+      pickDate: 'Pick Date',
+      pickTime: 'Pick Time',
+      time: 'Time',
+      year: 'Year',
+    };
 
   const [openPanel, setOpenPanel] = useState<'date' | 'time' | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
