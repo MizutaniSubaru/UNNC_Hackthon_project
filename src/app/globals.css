@@ -473,15 +473,6 @@ button:disabled {
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-.planner-panel--guide::after {
-  content: '';
-  position: absolute;
-  inset: 12px;
-  border: 1px solid rgba(221, 105, 72, 0.12);
-  border-radius: 22px;
-  pointer-events: none;
-}
-
 .planner-panel--composer {
   margin-top: 8px;
   background:
@@ -675,15 +666,6 @@ button:disabled {
     inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
-.quote-rotator::after {
-  content: '';
-  position: absolute;
-  inset: 10px;
-  border: 1px dashed rgba(221, 105, 72, 0.26);
-  border-radius: 20px;
-  pointer-events: none;
-}
-
 .quote-rotator__header {
   align-items: center;
   justify-content: center;
@@ -704,12 +686,8 @@ button:disabled {
   display: grid;
   flex: 1;
   align-items: center;
-  border: 1px solid rgba(20, 33, 61, 0.11);
   border-radius: 18px;
   padding: 12px 14px;
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(255, 251, 245, 0.8)),
-    linear-gradient(transparent 95%, rgba(20, 33, 61, 0.05) 95%);
   overflow: hidden;
 }
 
