@@ -15,6 +15,13 @@ export type EventStatus = (typeof EVENT_STATUSES)[number];
 
 export type ItemType = 'todo' | 'event';
 
+export type LaunchOrigin = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
 export type ParseResult = {
   ambiguity_reason: string | null;
   confidence: number;

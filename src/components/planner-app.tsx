@@ -12,6 +12,7 @@ import { DateTimeWheelPicker } from '@/components/date-time-wheel-picker';
 import { ItemEditor } from '@/components/item-editor';
 import { DEFAULT_TIMEZONE, GROUPS, PRIORITIES } from '@/lib/constants';
 import { COPY } from '@/lib/copy';
+import { createLaunchOrigin } from '@/lib/launch-origin';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import {
   formatDateTimeLabel,
@@ -25,6 +26,7 @@ import type {
   ActivityLog,
   Item,
   ItemType,
+  LaunchOrigin,
   ParseResult,
   Priority,
 } from '@/lib/types';
@@ -48,7 +50,7 @@ type TodoRailProps = {
   items: Item[];
   locale: string;
   onQuickStatus: (item: Item, status: string) => void;
-  onSelectItem: (item: Item) => void;
+  onSelectItem: (item: Item, launchOrigin: LaunchOrigin | null) => void;
   priorityFilter: string;
   search: string;
   setGroupFilter: (value: string) => void;
@@ -317,19 +319,21 @@ function ConfirmationModal({
     return null;
   }
 
+  const activeDraft = draft;
+
   function handleDraftStartConfirm(nextStart: string) {
-    const nextEnd = ensureEndAfterStartValue(nextStart, draft.end_at);
+    const nextEnd = ensureEndAfterStartValue(nextStart, activeDraft.end_at);
     onChange({
-      ...draft,
+      ...activeDraft,
       end_at: nextEnd,
       start_at: nextStart,
     });
   }
 
   function handleDraftEndConfirm(nextEndInput: string) {
-    const nextEnd = ensureEndAfterStartValue(draft.start_at, nextEndInput);
+    const nextEnd = ensureEndAfterStartValue(activeDraft.start_at, nextEndInput);
     onChange({
-      ...draft,
+      ...activeDraft,
       end_at: nextEnd,
     });
   }
@@ -338,29 +342,29 @@ function ConfirmationModal({
     <>
       <button
         aria-label="Close confirmation dialog"
-        className="confirmation-modal__overlay"
+        className="planner-modal__overlay is-visible"
         onClick={onDismiss}
         type="button"
       />
       <div
         aria-labelledby="confirmation-dialog-title"
         aria-modal="true"
-        className="confirmation-modal"
+        className="planner-modal"
         role="dialog"
       >
-        <section className="planner-panel planner-panel--confirmation planner-panel--confirmation-modal">
+        <section className="planner-panel planner-panel--confirmation planner-panel--modal planner-panel--confirmation-modal planner-panel--modal-pop">
           <div className="planner-panel__header">
             <div>
               <p className="planner-panel__eyebrow">{copy.sections.confirmation}</p>
               <h2 className="planner-panel__title" id="confirmation-dialog-title">
-                {draft.title}
+                {activeDraft.title}
               </h2>
             </div>
             <div className="planner-badges">
               <span className="planner-badge">
                 {mode === 'fallback' ? copy.badges.demoFallback : copy.badges.aiSuggested}
               </span>
-              {draft.needs_confirmation ? (
+              {activeDraft.needs_confirmation ? (
                 <span className="planner-badge planner-badge--warning">
                   {copy.badges.needsConfirmation}
                 </span>
@@ -373,8 +377,8 @@ function ConfirmationModal({
               <span>{copy.labels.title}</span>
               <input
                 autoFocus
-                onChange={(event) => onChange({ ...draft, title: event.target.value })}
-                value={draft.title}
+                onChange={(event) => onChange({ ...activeDraft, title: event.target.value })}
+                value={activeDraft.title}
               />
             </label>
 
@@ -382,9 +386,9 @@ function ConfirmationModal({
               <span>{copy.labels.type}</span>
               <select
                 onChange={(event) =>
-                  onChange({ ...draft, type: event.target.value as ItemType })
+                  onChange({ ...activeDraft, type: event.target.value as ItemType })
                 }
-                value={draft.type}
+                value={activeDraft.type}
               >
                 <option value="todo">todo</option>
                 <option value="event">event</option>
@@ -396,11 +400,11 @@ function ConfirmationModal({
               <select
                 onChange={(event) =>
                   onChange({
-                    ...draft,
+                    ...activeDraft,
                     group_key: event.target.value as ParseResult['group_key'],
                   })
                 }
-                value={draft.group_key}
+                value={activeDraft.group_key}
               >
                 {GROUPS.map((group) => (
                   <option key={group.key} value={group.key}>
@@ -415,11 +419,11 @@ function ConfirmationModal({
               <select
                 onChange={(event) =>
                   onChange({
-                    ...draft,
+                    ...activeDraft,
                     priority: event.target.value as Priority,
                   })
                 }
-                value={draft.priority}
+                value={activeDraft.priority}
               >
                 {PRIORITIES.map((priority) => (
                   <option key={priority} value={priority}>
@@ -435,25 +439,25 @@ function ConfirmationModal({
                 min={0}
                 onChange={(event) =>
                   onChange({
-                    ...draft,
+                    ...activeDraft,
                     estimated_minutes: Number(event.target.value || 0),
                   })
                 }
                 type="number"
-                value={draft.estimated_minutes ?? 0}
+                value={activeDraft.estimated_minutes ?? 0}
               />
             </label>
 
             <label className="field field--checkbox">
               <span>{copy.badges.allDay}</span>
               <input
-                checked={draft.is_all_day}
+                checked={activeDraft.is_all_day}
                 onChange={(event) =>
                   onChange({
-                    ...draft,
-                    end_at: event.target.checked ? null : draft.end_at,
+                    ...activeDraft,
+                    end_at: event.target.checked ? null : activeDraft.end_at,
                     is_all_day: event.target.checked,
-                    start_at: event.target.checked ? null : draft.start_at,
+                    start_at: event.target.checked ? null : activeDraft.start_at,
                   })
                 }
                 type="checkbox"
@@ -465,23 +469,23 @@ function ConfirmationModal({
               <input
                 onChange={(event) =>
                   onChange({
-                    ...draft,
+                    ...activeDraft,
                     due_date: event.target.value || null,
                   })
                 }
                 type="date"
-                value={draft.due_date ?? toDateInputValue(draft.start_at)}
+                value={activeDraft.due_date ?? toDateInputValue(activeDraft.start_at)}
               />
             </label>
 
-            {!draft.is_all_day ? (
+            {!activeDraft.is_all_day ? (
               <>
                 <div className="field">
                   <span>{copy.labels.start}</span>
                   <DateTimeWheelPicker
                     locale={locale}
                     onConfirm={handleDraftStartConfirm}
-                    value={draft.start_at}
+                    value={activeDraft.start_at}
                   />
                 </div>
 
@@ -489,16 +493,16 @@ function ConfirmationModal({
                   <span>{copy.labels.end}</span>
                   <DateTimeWheelPicker
                     locale={locale}
-                    minValue={draft.start_at}
+                    minValue={activeDraft.start_at}
                     onConfirm={handleDraftEndConfirm}
                     strictAfterMin
-                    value={draft.end_at}
+                    value={activeDraft.end_at}
                   />
                 </div>
               </>
             ) : null}
 
-            {!draft.is_all_day && hasInvalidTimedEventRange(draft) ? (
+            {!activeDraft.is_all_day && hasInvalidTimedEventRange(activeDraft) ? (
               <p className="panel-note panel-note--warning field--full">
                 {locale.startsWith('zh')
                   ? '结束时间必须晚于开始时间。'
@@ -509,17 +513,17 @@ function ConfirmationModal({
             <label className="field field--full">
               <span>{copy.labels.location}</span>
               <input
-                onChange={(event) => onChange({ ...draft, location: event.target.value })}
-                value={draft.location}
+                onChange={(event) => onChange({ ...activeDraft, location: event.target.value })}
+                value={activeDraft.location}
               />
             </label>
 
             <label className="field field--full">
               <span>{copy.labels.notes}</span>
               <textarea
-                onChange={(event) => onChange({ ...draft, notes: event.target.value })}
+                onChange={(event) => onChange({ ...activeDraft, notes: event.target.value })}
                 rows={4}
-                value={draft.notes}
+                value={activeDraft.notes}
               />
             </label>
 
@@ -529,8 +533,8 @@ function ConfirmationModal({
             </label>
           </div>
 
-          {draft.ambiguity_reason ? (
-            <p className="panel-note panel-note--warning">{draft.ambiguity_reason}</p>
+          {activeDraft.ambiguity_reason ? (
+            <p className="panel-note panel-note--warning">{activeDraft.ambiguity_reason}</p>
           ) : null}
 
           <div className="editor-actions">
@@ -612,7 +616,13 @@ function TodoRail({
         ) : null}
         {items.map((item) => (
           <article className="todo-card" key={item.id}>
-            <button className="todo-card__main" onClick={() => onSelectItem(item)} type="button">
+            <button
+              className="todo-card__main"
+              onClick={(event) =>
+                onSelectItem(item, createLaunchOrigin(event.currentTarget.getBoundingClientRect()))
+              }
+              type="button"
+            >
               <span className={`todo-card__dot todo-card__dot--${item.priority}`} />
               <div>
                 <h3>{item.title}</h3>
@@ -680,10 +690,8 @@ function HistoryTimeline({
 }: HistoryTimelineProps) {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    setSelectedIds((current) => current.filter((id) => logs.some((log) => log.id === id)));
-  }, [logs]);
+  const logIdSet = new Set(logs.map((log) => log.id));
+  const activeSelectedIds = selectedIds.filter((id) => logIdSet.has(id));
 
   function exitSelectMode() {
     setSelectMode(false);
@@ -698,7 +706,7 @@ function HistoryTimeline({
     );
   }
 
-  const allSelected = logs.length > 0 && selectedIds.length === logs.length;
+  const allSelected = logs.length > 0 && activeSelectedIds.length === logs.length;
 
   return (
     <section className="planner-panel planner-panel--history">
@@ -737,8 +745,8 @@ function HistoryTimeline({
         <div className="history-bulk-actions">
           <p>
             {locale.startsWith('zh')
-              ? `已选择 ${selectedIds.length} 条日志`
-              : `${selectedIds.length} selected`}
+              ? `已选择 ${activeSelectedIds.length} 条日志`
+              : `${activeSelectedIds.length} selected`}
           </p>
           <div className="history-bulk-actions__buttons">
             <button
@@ -757,9 +765,9 @@ function HistoryTimeline({
                   : 'Select all'}
             </button>
             <button
-              disabled={busy || selectedIds.length === 0}
+              disabled={busy || activeSelectedIds.length === 0}
               onClick={() =>
-                void onUndoLogs(selectedIds).then(() => {
+                void onUndoLogs(activeSelectedIds).then(() => {
                   exitSelectMode();
                 })
               }
@@ -768,9 +776,9 @@ function HistoryTimeline({
               {locale.startsWith('zh') ? '撤销' : 'Undo'}
             </button>
             <button
-              disabled={busy || selectedIds.length === 0}
+              disabled={busy || activeSelectedIds.length === 0}
               onClick={() =>
-                void onDeleteLogs(selectedIds).then(() => {
+                void onDeleteLogs(activeSelectedIds).then(() => {
                   exitSelectMode();
                 })
               }
@@ -790,13 +798,13 @@ function HistoryTimeline({
         ) : null}
         {logs.map((log) => (
           <article
-            className={`history-card ${selectedIds.includes(log.id) ? 'history-card--selected' : ''}`}
+            className={`history-card ${activeSelectedIds.includes(log.id) ? 'history-card--selected' : ''}`}
             key={log.id}
           >
             {selectMode ? (
               <label className="history-card__check">
                 <input
-                  checked={selectedIds.includes(log.id)}
+                  checked={activeSelectedIds.includes(log.id)}
                   disabled={busy}
                   onChange={() => toggleSelect(log.id)}
                   type="checkbox"
@@ -853,6 +861,7 @@ export function PlannerApp() {
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [parseMode, setParseMode] = useState<'ai' | 'fallback' | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedItemLaunchOrigin, setSelectedItemLaunchOrigin] = useState<LaunchOrigin | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [focusDate, setFocusDate] = useState(() => new Date());
@@ -902,6 +911,16 @@ export function PlannerApp() {
     setDraft(null);
     setParseMode(null);
     setIsConfirmationOpen(false);
+  }, []);
+
+  const closeSelectedItem = useCallback(() => {
+    setSelectedItem(null);
+    setSelectedItemLaunchOrigin(null);
+  }, []);
+
+  const handleOpenItem = useCallback((item: Item, launchOrigin: LaunchOrigin | null) => {
+    setSelectedItem(item);
+    setSelectedItemLaunchOrigin(launchOrigin);
   }, []);
 
   async function jsonRequest(path: string, init?: RequestInit) {
@@ -1038,10 +1057,19 @@ export function PlannerApp() {
       startTransition(() => {
         void loadWorkspace();
       });
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to update item.');
+      return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleSaveItemAndClose(item: Item) {
+    const didSave = await handleSaveItem(item);
+    if (didSave) {
+      closeSelectedItem();
     }
   }
 
@@ -1053,7 +1081,7 @@ export function PlannerApp() {
       await jsonRequest(`/api/items/${item.id}`, {
         method: 'DELETE',
       });
-      setSelectedItem(null);
+      closeSelectedItem();
       setMessage(locale.startsWith('zh') ? '事项已删除。' : 'Item deleted.');
       startTransition(() => {
         void loadWorkspace();
@@ -1070,7 +1098,9 @@ export function PlannerApp() {
 
     if (status === 'completed' || status === 'cancelled') {
       setItems((current) => current.filter((entry) => entry.id !== item.id));
-      setSelectedItem((current) => (current?.id === item.id ? null : current));
+      if (selectedItem?.id === item.id) {
+        closeSelectedItem();
+      }
     }
   }
 
@@ -1230,13 +1260,23 @@ export function PlannerApp() {
         sourceText={composerText}
       />
 
+      <ItemEditor
+        item={selectedItem}
+        launchOrigin={selectedItemLaunchOrigin}
+        locale={locale}
+        onChange={setSelectedItem}
+        onDelete={(item) => void handleDeleteItem(item)}
+        onDismiss={closeSelectedItem}
+        onSave={(item) => void handleSaveItemAndClose(item)}
+      />
+
       <section className="planner-grid planner-grid--bottom planner-grid--triple">
         <CalendarFull
           focusDate={focusDate}
           items={calendarItems}
           locale={locale}
           onFocusDateChange={setFocusDate}
-          onSelectItem={setSelectedItem}
+          onSelectItem={handleOpenItem}
           timezone={timezone}
         />
         <TodoRail
@@ -1245,7 +1285,7 @@ export function PlannerApp() {
           items={filteredTodos}
           locale={locale}
           onQuickStatus={(item, status) => void handleQuickStatus(item, status)}
-          onSelectItem={setSelectedItem}
+          onSelectItem={handleOpenItem}
           priorityFilter={priorityFilter}
           search={search}
           setGroupFilter={setGroupFilter}
@@ -1263,14 +1303,6 @@ export function PlannerApp() {
           onUndoLogs={handleUndoLogs}
         />
       </section>
-
-      <ItemEditor
-        item={selectedItem}
-        locale={locale}
-        onChange={setSelectedItem}
-        onDelete={(item) => void handleDeleteItem(item)}
-        onSave={(item) => void handleSaveItem(item)}
-      />
     </main>
   );
 }

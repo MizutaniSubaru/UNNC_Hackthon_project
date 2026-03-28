@@ -8,15 +8,16 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import { GROUPS } from '@/lib/constants';
+import { createLaunchOrigin } from '@/lib/launch-origin';
 import { formatEventTimeRange } from '@/lib/time';
-import type { Item } from '@/lib/types';
+import type { Item, LaunchOrigin } from '@/lib/types';
 
 type CalendarFullProps = {
   focusDate: Date;
   items: Item[];
   locale: string;
   onFocusDateChange: (date: Date) => void;
-  onSelectItem: (item: Item) => void;
+  onSelectItem: (item: Item, launchOrigin: LaunchOrigin | null) => void;
   timezone: string;
 };
 
@@ -389,7 +390,7 @@ export function CalendarFull({
     (args: EventClickArg) => {
       const sourceItem = args.event.extendedProps.sourceItem as Item | undefined;
       if (sourceItem) {
-        onSelectItem(sourceItem);
+        onSelectItem(sourceItem, createLaunchOrigin(args.el.getBoundingClientRect()));
       }
     },
     [onSelectItem]

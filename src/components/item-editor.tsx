@@ -1,17 +1,35 @@
 'use client';
 
-import { EVENT_STATUSES, GROUPS, PRIORITIES, TODO_STATUSES } from '@/lib/constants';
+import { useEffect, useId, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import type { CSSProperties } from 'react';
+import { X } from 'lucide-react';
 import { DateTimeWheelPicker } from '@/components/date-time-wheel-picker';
 import { COPY } from '@/lib/copy';
-import {
-  isEndAfterStart,
-  toDateInputValue,
-  toDateTimeInputValue,
-} from '@/lib/time';
-import type { Item, ItemType } from '@/lib/types';
+import { EVENT_STATUSES, GROUPS, PRIORITIES, TODO_STATUSES } from '@/lib/constants';
+import { hasValidLaunchOrigin } from '@/lib/launch-origin';
+import { isEndAfterStart, toDateInputValue, toDateTimeInputValue } from '@/lib/time';
+import type { Item, ItemType, LaunchOrigin } from '@/lib/types';
 
 type ItemEditorProps = {
   item: Item | null;
+  launchOrigin: LaunchOrigin | null;
+  locale: string;
+  onChange: (item: Item) => void;
+  onDelete: (item: Item) => void;
+  onDismiss: () => void;
+  onSave: (item: Item) => void;
+};
+
+type LaunchMotionStyle = CSSProperties & {
+  '--planner-modal-origin-scale-x': string;
+  '--planner-modal-origin-scale-y': string;
+  '--planner-modal-origin-x': string;
+  '--planner-modal-origin-y': string;
+};
+
+type ItemEditorFormProps = {
+  copy: typeof COPY.en;
+  item: Item;
   locale: string;
   onChange: (item: Item) => void;
   onDelete: (item: Item) => void;
@@ -64,24 +82,61 @@ function buildDefaultEndAt(startAt: string, estimatedMinutes: number | null) {
   return toDateTimeInputValue(start);
 }
 
-export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEditorProps) {
-  const copy = locale.startsWith('zh') ? COPY.zh : COPY.en;
+function usePrefersReducedMotion() {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+        return () => undefined;
+      }
 
-  if (!item) {
-    return (
-      <section className="planner-panel planner-panel--editor">
-        <div className="planner-panel__header">
-          <div>
-            <p className="planner-panel__eyebrow">{copy.sections.editor}</p>
-            <h2 className="planner-panel__title">
-              {locale.startsWith('zh') ? '选择一个事项进行编辑' : 'Pick an item to edit'}
-            </h2>
-          </div>
-        </div>
-      </section>
-    );
-  }
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const handleChange = () => onStoreChange();
 
+      if (typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+      }
+
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    },
+    () => {
+      if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+        return false;
+      }
+
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    },
+    () => false
+  );
+}
+
+function buildLaunchMotionStyle(origin: LaunchOrigin, targetRect: DOMRect): LaunchMotionStyle {
+  const targetWidth = Math.max(targetRect.width, 1);
+  const targetHeight = Math.max(targetRect.height, 1);
+  const originWidth = Math.max(Math.min(origin.width, targetWidth), 40);
+  const originHeight = Math.max(Math.min(origin.height, targetHeight), 28);
+  const sourceCenterX = origin.left + origin.width / 2;
+  const sourceCenterY = origin.top + origin.height / 2;
+  const targetCenterX = targetRect.left + targetRect.width / 2;
+  const targetCenterY = targetRect.top + targetRect.height / 2;
+
+  return {
+    '--planner-modal-origin-scale-x': String(originWidth / targetWidth),
+    '--planner-modal-origin-scale-y': String(originHeight / targetHeight),
+    '--planner-modal-origin-x': `${sourceCenterX - targetCenterX}px`,
+    '--planner-modal-origin-y': `${sourceCenterY - targetCenterY}px`,
+  };
+}
+
+function ItemEditorForm({
+  copy,
+  item,
+  locale,
+  onChange,
+  onDelete,
+  onSave,
+}: ItemEditorFormProps) {
   const statusOptions = item.type === 'event' ? EVENT_STATUSES : TODO_STATUSES;
   const invalidRange =
     item.type === 'event' &&
@@ -91,10 +146,6 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
     !isEndAfterStart(item.start_at, item.end_at);
 
   function handleStartConfirm(nextStart: string) {
-    if (!item) {
-      return;
-    }
-
     const nextEnd = ensureEndAfterStartValue(nextStart, item.end_at);
     onChange({
       ...item,
@@ -104,10 +155,6 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
   }
 
   function handleEndConfirm(nextEndInput: string) {
-    if (!item) {
-      return;
-    }
-
     const nextEnd = ensureEndAfterStartValue(item.start_at, nextEndInput);
     onChange({
       ...item,
@@ -116,10 +163,6 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
   }
 
   function handleTypeChange(nextType: ItemType) {
-    if (!item) {
-      return;
-    }
-
     if (nextType === item.type) {
       return;
     }
@@ -150,18 +193,12 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
   }
 
   return (
-    <section className="planner-panel planner-panel--editor">
-      <div className="planner-panel__header">
-        <div>
-          <p className="planner-panel__eyebrow">{copy.sections.editor}</p>
-          <h2 className="planner-panel__title">{item.title}</h2>
-        </div>
-      </div>
-
+    <>
       <div className="editor-grid">
         <label className="field">
           <span>{copy.labels.title}</span>
           <input
+            autoFocus
             onChange={(event) => onChange({ ...item, title: event.target.value })}
             value={item.title}
           />
@@ -242,9 +279,9 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
             onChange={(event) =>
               onChange({
                 ...item,
+                end_at: event.target.checked ? null : item.end_at,
                 is_all_day: event.target.checked,
                 start_at: event.target.checked ? null : item.start_at,
-                end_at: event.target.checked ? null : item.end_at,
               })
             }
             type="checkbox"
@@ -327,6 +364,151 @@ export function ItemEditor({ item, locale, onChange, onDelete, onSave }: ItemEdi
           {copy.actions.save}
         </button>
       </div>
-    </section>
+    </>
+  );
+}
+
+export function ItemEditor({
+  item,
+  launchOrigin,
+  locale,
+  onChange,
+  onDelete,
+  onDismiss,
+  onSave,
+}: ItemEditorProps) {
+  const copy = locale.startsWith('zh') ? COPY.zh : COPY.en;
+  const dialogTitleId = useId();
+  const overlayRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const itemId = item?.id ?? null;
+  const useLaunchTransition = !prefersReducedMotion && hasValidLaunchOrigin(launchOrigin);
+
+  useEffect(() => {
+    if (!item) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [item]);
+
+  useEffect(() => {
+    if (!item) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onDismiss();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [item, onDismiss]);
+
+  useLayoutEffect(() => {
+    if (!itemId) {
+      return;
+    }
+
+    const overlay = overlayRef.current;
+    const panel = panelRef.current;
+    if (!overlay || !panel) {
+      return;
+    }
+
+    overlay.classList.remove('is-visible');
+    panel.classList.remove('is-visible');
+    panel.style.removeProperty('--planner-modal-origin-scale-x');
+    panel.style.removeProperty('--planner-modal-origin-scale-y');
+    panel.style.removeProperty('--planner-modal-origin-x');
+    panel.style.removeProperty('--planner-modal-origin-y');
+
+    if (!useLaunchTransition) {
+      overlay.classList.add('is-visible');
+      return;
+    }
+
+    const launchStyle = buildLaunchMotionStyle(launchOrigin, panel.getBoundingClientRect());
+    panel.style.setProperty('--planner-modal-origin-scale-x', launchStyle['--planner-modal-origin-scale-x']);
+    panel.style.setProperty('--planner-modal-origin-scale-y', launchStyle['--planner-modal-origin-scale-y']);
+    panel.style.setProperty('--planner-modal-origin-x', launchStyle['--planner-modal-origin-x']);
+    panel.style.setProperty('--planner-modal-origin-y', launchStyle['--planner-modal-origin-y']);
+
+    const frame = requestAnimationFrame(() => {
+      overlay.classList.add('is-visible');
+      panel.classList.add('is-visible');
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [itemId, launchOrigin, useLaunchTransition]);
+
+  if (!item) {
+    return null;
+  }
+
+  const closeLabel = locale.startsWith('zh') ? '关闭编辑弹窗' : 'Close item editor';
+  const panelClassName = [
+    'planner-panel',
+    'planner-panel--modal',
+    'planner-panel--editor-modal',
+    useLaunchTransition ? 'planner-panel--modal-launch' : 'planner-panel--modal-pop',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <>
+      <button
+        aria-label={closeLabel}
+        className="planner-modal__overlay"
+        onClick={onDismiss}
+        ref={overlayRef}
+        type="button"
+      />
+      <div
+        aria-labelledby={dialogTitleId}
+        aria-modal="true"
+        className="planner-modal"
+        role="dialog"
+      >
+        <section className={panelClassName} ref={panelRef}>
+          <div className="planner-panel__header item-editor-modal__header">
+            <div>
+              <p className="planner-panel__eyebrow">{copy.sections.editor}</p>
+              <h2 className="planner-panel__title" id={dialogTitleId}>
+                {item.title}
+              </h2>
+            </div>
+            <button
+              aria-label={closeLabel}
+              className="item-editor-modal__close"
+              onClick={onDismiss}
+              type="button"
+            >
+              <X aria-hidden="true" size={18} />
+            </button>
+          </div>
+
+          <ItemEditorForm
+            copy={copy}
+            item={item}
+            locale={locale}
+            onChange={onChange}
+            onDelete={onDelete}
+            onSave={onSave}
+          />
+        </section>
+      </div>
+    </>
   );
 }
