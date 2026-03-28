@@ -970,7 +970,6 @@ function EmptyWorkspace({ copy }: { copy: typeof COPY.en }) {
     <main className="landing-shell">
       <div className="landing-shell__glow" />
       <section className="landing-card">
-        <p className="landing-card__eyebrow">Orbit Planner / shared workspace</p>
         <h1 className="landing-card__title">Supabase configuration required.</h1>
         <p className="landing-card__body">
           Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, then reload the app.
@@ -1419,12 +1418,7 @@ export function PlannerApp() {
 
       <section className="planner-hero">
         <div>
-          <p className="planner-hero__eyebrow">Task calendar management / shared timeline</p>
-          <h1 className="planner-hero__title">
-            {locale.startsWith('zh')
-              ? '自然语言直接生成日历、待办与历史记录'
-              : 'Natural language into calendar, to-dos, and activity history'}
-          </h1>
+          <h1 className="planner-hero__title">Orbit Planner</h1>
         </div>
         <div className="planner-hero__controls">
           <button
