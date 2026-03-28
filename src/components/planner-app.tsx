@@ -816,7 +816,7 @@ function HistoryTimeline({
         ) : null}
         {logs.map((log) => (
           <article
-            className={`history-card ${activeSelectedIds.includes(log.id) ? 'history-card--selected' : ''}`}
+            className={`history-card ${activeSelectedIds.includes(log.id) ? 'history-card--selected' : ''} ${log.action === 'updated' && !isUndoLog(log) ? 'history-card--compact' : ''}`}
             key={log.id}
           >
             {selectMode ? (
@@ -841,7 +841,7 @@ function HistoryTimeline({
               <time>{formatDateTimeLabel(log.created_at, locale, DEFAULT_TIMEZONE)}</time>
             </div>
             <h3>{log.item_title}</h3>
-            <p>{log.summary}</p>
+            {log.action === 'updated' && !isUndoLog(log) ? null : <p>{log.summary}</p>}
           </article>
         ))}
       </div>
