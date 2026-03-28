@@ -36,7 +36,6 @@ export const COPY: Record<'en' | 'zh', LocaleCopy> = {
     labels: {
       dueDate: 'Due date',
       end: 'End',
-      estimatedMinutes: 'Estimated minutes',
       group: 'Group',
       location: 'Location',
       notes: 'Notes',
@@ -97,7 +96,6 @@ export const COPY: Record<'en' | 'zh', LocaleCopy> = {
     labels: {
       dueDate: '\u65e5\u671f',
       end: '\u7ed3\u675f\u65f6\u95f4',
-      estimatedMinutes: '\u9884\u8ba1\u8017\u65f6',
       group: '\u5206\u7ec4',
       location: '\u5730\u70b9',
       notes: '\u5907\u6ce8',

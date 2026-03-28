@@ -33,7 +33,6 @@ describe('parseInputWithAi', () => {
     queuedPayload = {
       ambiguity_reason: null,
       confidence: 0.97,
-      estimated_minutes: 60,
       location: 'A44',
       needs_confirmation: true,
       priority: 'medium',
@@ -59,6 +58,7 @@ describe('parseInputWithAi', () => {
     expect(messages[0]?.role).toBe('system');
     expect(messages[0]?.content).toContain('You are a bilingual AI planning assistant.');
     expect(messages[0]?.content).toContain('Return only a JSON object with these keys:');
+    expect(messages[0]?.content).not.toContain('estimated_minutes');
     expect(messages[1]?.role).toBe('user');
     expect(messages[1]?.content).toBe('Meet my advisor tomorrow at 3 PM in A44');
   });
@@ -67,7 +67,6 @@ describe('parseInputWithAi', () => {
     queuedPayload = {
       ambiguity_reason: null,
       confidence: 0.93,
-      estimated_minutes: null,
       location: 'Jubilee Campus',
       needs_confirmation: false,
       priority: 'high',

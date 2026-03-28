@@ -29,7 +29,6 @@ import type {
 type EditorFieldsValue = {
   due_date: string | null;
   end_at: string | null;
-  estimated_minutes: number | null;
   group_key: string;
   is_all_day: boolean;
   location: string | null;
@@ -139,21 +138,6 @@ export function PlannerEditorFields<T extends EditorFieldsValue>({
           </select>
         </label>
       ) : null}
-
-      <label className="field">
-        <span>{copy.labels.estimatedMinutes}</span>
-        <input
-          min={0}
-          onChange={(event) =>
-            onChange({
-              ...value,
-              estimated_minutes: Number(event.target.value || 0),
-            })
-          }
-          type="number"
-          value={value.estimated_minutes ?? 0}
-        />
-      </label>
 
       {timingVisibility.showDueDate ? (
         <label className="field">

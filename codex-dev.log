@@ -1,0 +1,31 @@
+▲ Next.js 16.1.6 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 5.9s
+○ Compiling / ...
+ GET / 200 in 4.9s (compile: 4.6s, render: 259ms)
+ GET / 200 in 69ms (compile: 17ms, render: 51ms)
+ GET /api/history?limit=50 200 in 2.2s (compile: 1492ms, render: 706ms)
+ GET /api/quotes?limit=120 200 in 2.3s (compile: 1496ms, render: 813ms)
+ GET / 200 in 187ms (compile: 133ms, render: 54ms)
+ GET / 200 in 76ms (compile: 40ms, render: 36ms)
+ GET /api/history?limit=50 200 in 1614ms (compile: 425ms, render: 1189ms)
+ GET / 200 in 118ms (compile: 75ms, render: 43ms)
+ GET /api/history?limit=50 200 in 719ms (compile: 49ms, render: 671ms)
+ GET / 200 in 43ms (compile: 9ms, render: 34ms)
+ GET / 200 in 24ms (compile: 7ms, render: 18ms)
+ GET / 200 in 30ms (compile: 7ms, render: 22ms)
+ GET / 200 in 27ms (compile: 6ms, render: 21ms)
+ GET / 200 in 30ms (compile: 8ms, render: 22ms)
+ GET / 200 in 29ms (compile: 5ms, render: 24ms)
+ GET / 200 in 24ms (compile: 6ms, render: 18ms)
+ GET / 200 in 29ms (compile: 6ms, render: 23ms)
+ GET / 200 in 24ms (compile: 5ms, render: 19ms)
+ GET / 200 in 30ms (compile: 6ms, render: 24ms)
+ GET / 200 in 22ms (compile: 5ms, render: 17ms)
+ GET / 200 in 24ms (compile: 5ms, render: 19ms)
+ GET / 200 in 26ms (compile: 5ms, render: 22ms)
+ GET / 200 in 39ms (compile: 8ms, render: 32ms)

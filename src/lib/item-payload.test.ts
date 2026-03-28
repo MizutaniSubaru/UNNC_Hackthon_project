@@ -24,30 +24,39 @@ const BASE_ITEM: Item = {
 };
 
 describe('item payload normalization', () => {
-  it('reconciles create payload duration from the explicit timed range', () => {
+  it('preserves explicit end time and clears estimated minutes on create', () => {
     const normalized = normalizeCreatePayload({
       end_at: '2026-03-30T10:00:00.000Z',
-      estimated_minutes: 60,
       start_at: '2026-03-30T06:00:00.000Z',
       title: 'Meeting',
       type: 'event',
     });
 
     expect(normalized.end_at).toBe('2026-03-30T10:00:00.000Z');
-    expect(normalized.estimated_minutes).toBe(240);
+    expect(normalized.estimated_minutes).toBeNull();
   });
 
-  it('reconciles update payload duration from the explicit timed range', () => {
+  it('preserves explicit end time and clears estimated minutes on update', () => {
     const normalized = normalizeUpdatePayload(
       {
         end_at: '2026-03-30T12:00:00.000Z',
-        estimated_minutes: 60,
         start_at: '2026-03-30T06:00:00.000Z',
       },
       BASE_ITEM
     );
 
     expect(normalized.end_at).toBe('2026-03-30T12:00:00.000Z');
-    expect(normalized.estimated_minutes).toBe(360);
+    expect(normalized.estimated_minutes).toBeNull();
+  });
+
+  it('keeps timed events open-ended when no end time is provided', () => {
+    const normalized = normalizeCreatePayload({
+      start_at: '2026-03-30T06:00:00.000Z',
+      title: 'Meeting',
+      type: 'event',
+    });
+
+    expect(normalized.end_at).toBeNull();
+    expect(normalized.estimated_minutes).toBeNull();
   });
 });

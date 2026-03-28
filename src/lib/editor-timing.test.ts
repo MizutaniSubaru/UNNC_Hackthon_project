@@ -13,7 +13,6 @@ describe('editor timing helpers', () => {
       {
         due_date: null,
         end_at: '2026-03-30T04:00',
-        estimated_minutes: 60,
         is_all_day: false,
         start_at: '2026-03-30T03:00',
         type: 'event' as const,
@@ -33,7 +32,6 @@ describe('editor timing helpers', () => {
       {
         due_date: null,
         end_at: '2026-03-30T04:00',
-        estimated_minutes: 60,
         is_all_day: false,
         start_at: '2026-03-30T03:00',
         type: 'event' as const,
@@ -51,7 +49,6 @@ describe('editor timing helpers', () => {
     const allDay = sanitizeTimingForSubmission({
       due_date: '2026-03-30',
       end_at: null,
-      estimated_minutes: 60,
       is_all_day: true,
       start_at: '2026-03-30T03:00',
       type: 'event' as const,
@@ -59,7 +56,6 @@ describe('editor timing helpers', () => {
     const timed = sanitizeTimingForSubmission({
       due_date: '2026-03-30',
       end_at: '2026-03-30T04:00',
-      estimated_minutes: 60,
       is_all_day: false,
       start_at: '2026-03-30T03:00',
       type: 'event' as const,
@@ -74,12 +70,28 @@ describe('editor timing helpers', () => {
     expect(timed.end_at).toBe('2026-03-30T04:00');
   });
 
-  it('syncs estimated duration when the end time changes', () => {
+  it('switches a todo into an event without auto-filling the end time', () => {
+    const next = applyTypeChange(
+      {
+        due_date: '2026-03-30',
+        end_at: null,
+        is_all_day: false,
+        start_at: null,
+        type: 'todo' as const,
+      },
+      'event'
+    );
+
+    expect(next.type).toBe('event');
+    expect(next.start_at).toBe('2026-03-30T09:00');
+    expect(next.end_at).toBeNull();
+  });
+
+  it('updates the end time directly when the event end changes', () => {
     const next = applyEndAtChange(
       {
         due_date: null,
         end_at: '2026-03-30T04:00',
-        estimated_minutes: 60,
         is_all_day: false,
         start_at: '2026-03-30T03:00',
         type: 'event' as const,
@@ -88,15 +100,13 @@ describe('editor timing helpers', () => {
     );
 
     expect(next.end_at).toBe('2026-03-30T07:00');
-    expect(next.estimated_minutes).toBe(240);
   });
 
-  it('syncs estimated duration when the start time changes', () => {
+  it('keeps the explicit end time when the start time changes', () => {
     const next = applyStartAtChange(
       {
         due_date: null,
         end_at: '2026-03-30T07:00',
-        estimated_minutes: 60,
         is_all_day: false,
         start_at: '2026-03-30T03:00',
         type: 'event' as const,
@@ -105,6 +115,6 @@ describe('editor timing helpers', () => {
     );
 
     expect(next.start_at).toBe('2026-03-30T05:00');
-    expect(next.estimated_minutes).toBe(120);
+    expect(next.end_at).toBe('2026-03-30T07:00');
   });
 });

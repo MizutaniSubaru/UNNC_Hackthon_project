@@ -123,17 +123,51 @@ describe('fallbackParseInput', () => {
     expect(parsed.due_date).toBeNull();
   });
 
-  it('calculates timed event duration from start and end time', () => {
+  it('keeps explicit timed ranges from start and end time', () => {
     const parsed = fallbackParseInput(
       '\u4e0b\u5468\u4e00\u4e0b\u53482\u70b9\u52306\u70b9\u5728\u56fe\u4e66\u9986\u8ba8\u8bba\u8bba\u6587',
       SHANGHAI_TIMEZONE,
       REFERENCE_NOW
     );
+    const end = formatInTimezone(parsed.end_at, SHANGHAI_TIMEZONE);
 
     expect(parsed.type).toBe('event');
     expect(parsed.location).toBe('\u56fe\u4e66\u9986');
-    expect(parsed.estimated_minutes).toBe(240);
+    expect(end).toMatchObject({
+      day: '30',
+      hour: '18',
+      minute: '00',
+      month: '03',
+      year: '2026',
+    });
     expect(parsed.title).toBe('\u8ba8\u8bba\u8bba\u6587');
+  });
+
+  it('converts explicit durations into an end time when a start time is present', () => {
+    const parsed = fallbackParseInput(
+      '\u660e\u5929 10:00 \u5728 Portland Building \u5199 proposal 90 \u5206\u949f',
+      SHANGHAI_TIMEZONE,
+      REFERENCE_NOW
+    );
+    const start = formatInTimezone(parsed.start_at, SHANGHAI_TIMEZONE);
+    const end = formatInTimezone(parsed.end_at, SHANGHAI_TIMEZONE);
+
+    expect(parsed.type).toBe('event');
+    expect(parsed.location).toBe('Portland Building');
+    expect(start).toMatchObject({
+      day: '29',
+      hour: '10',
+      minute: '00',
+      month: '03',
+      year: '2026',
+    });
+    expect(end).toMatchObject({
+      day: '29',
+      hour: '11',
+      minute: '30',
+      month: '03',
+      year: '2026',
+    });
   });
 
   it('parses chinese numeral clock time without swallowing location digits', () => {
@@ -178,7 +212,9 @@ describe('fallbackParseInput', () => {
     );
 
     expect(parsed.type).toBe('todo');
-    expect(parsed.estimated_minutes).toBe(150);
+    expect(parsed.start_at).toBeNull();
+    expect(parsed.end_at).toBeNull();
+    expect(parsed).not.toHaveProperty('estimated_minutes');
     expect(parsed.title).toBe('\u5199\u8bba\u6587');
   });
 
@@ -192,7 +228,8 @@ describe('fallbackParseInput', () => {
     expect(parsed.type).toBe('event');
     expect(parsed.is_all_day).toBe(true);
     expect(parsed.due_date).toBe('2026-03-29');
-    expect(parsed.estimated_minutes).toBe(150);
+    expect(parsed.end_at).toBeNull();
+    expect(parsed).not.toHaveProperty('estimated_minutes');
     expect(parsed.title).toBe('\u5199\u8bba\u6587');
   });
 
@@ -206,7 +243,6 @@ describe('fallbackParseInput', () => {
     const end = formatInTimezone(parsed.end_at, SHANGHAI_TIMEZONE);
 
     expect(parsed.type).toBe('event');
-    expect(parsed.estimated_minutes).toBe(120);
     expect(parsed.title).toBe('\u5199\u8bba\u6587');
     expect(start).toMatchObject({
       day: '29',
@@ -236,7 +272,7 @@ describe('fallbackParseInput', () => {
     expect(parsed.type).toBe('event');
     expect(parsed.location).toBe('A44');
     expect(parsed.needs_confirmation).toBe(true);
-    expect(parsed.estimated_minutes).toBe(60);
+    expect(parsed.end_at).toBeNull();
     expect(parsed.title).toBe('\u89c1\u5bfc\u5e08');
     expect(start).toMatchObject({
       day: '29',
@@ -245,13 +281,7 @@ describe('fallbackParseInput', () => {
       month: '03',
       year: '2026',
     });
-    expect(end).toMatchObject({
-      day: '29',
-      hour: '02',
-      minute: '30',
-      month: '03',
-      year: '2026',
-    });
+    expect(end).toBeNull();
   });
 });
 
@@ -286,11 +316,9 @@ describe('normalizeParseResult', () => {
     expect(normalized.due_date).toBeNull();
   });
 
-  it('reconciles estimated_minutes from explicit timed range even when AI is wrong', () => {
+  it('keeps explicit timed ranges even when AI omits the end time', () => {
     const normalized = normalizeParseResult(
       {
-        end_at: '2026-03-30T10:00:00.000Z',
-        estimated_minutes: 60,
         start_at: '2026-03-30T06:00:00.000Z',
         title: '\u8ba8\u8bba\u8bba\u6587',
         type: 'event',
@@ -300,14 +328,13 @@ describe('normalizeParseResult', () => {
       REFERENCE_NOW
     );
 
-    expect(normalized.estimated_minutes).toBe(240);
+    expect(normalized.end_at).toBe('2026-03-30T10:00:00.000Z');
     expect(normalized.location).toBe('\u56fe\u4e66\u9986');
   });
 
   it('cleans time fragments out of english ai locations', () => {
     const normalized = normalizeParseResult(
       {
-        estimated_minutes: 60,
         location: '3 PM in A44',
         priority: 'medium',
         title: 'Meet my advisor',
@@ -319,12 +346,12 @@ describe('normalizeParseResult', () => {
 
     expect(normalized.location).toBe('A44');
     expect(normalized.start_at).not.toBeNull();
+    expect(normalized.end_at).toBeNull();
   });
 
   it('cleans trailing temporal fragments out of english ai locations', () => {
     const normalized = normalizeParseResult(
       {
-        estimated_minutes: 240,
         location: 'library next Monday from 2 PM',
         title: 'Discussion',
       },
@@ -334,7 +361,7 @@ describe('normalizeParseResult', () => {
     );
 
     expect(normalized.location).toBe('library');
-    expect(normalized.estimated_minutes).toBe(240);
+    expect(normalized.end_at).toBe('2026-03-30T10:00:00.000Z');
   });
 
   it('cleans chinese ai title and location fragments', () => {
@@ -356,7 +383,7 @@ describe('normalizeParseResult', () => {
 });
 
 describe('buildExtractedFields', () => {
-  it('returns the fixed five-field response shape for todos', () => {
+  it('returns the fixed response shape for todos', () => {
     const parsed = fallbackParseInput(
       '\u4e0b\u4e2a\u6708\u627e\u5bfc\u5e08\u804a\u8bba\u6587',
       SHANGHAI_TIMEZONE,
@@ -366,7 +393,6 @@ describe('buildExtractedFields', () => {
 
     expect(parsed.type).toBe('todo');
     expect(extracted).toEqual({
-      duration_minutes: 120,
       location: '',
       priority: 'low',
       time: {
@@ -378,6 +404,7 @@ describe('buildExtractedFields', () => {
       },
       title: '\u4e0b\u4e2a\u6708\u627e\u5bfc\u5e08\u804a\u8bba\u6587',
     });
+    expect(extracted).not.toHaveProperty('duration_minutes');
   });
 });
 

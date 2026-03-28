@@ -1,6 +1,4 @@
-import { DEFAULT_EVENT_MINUTES } from '@/lib/constants';
 import {
-  getDurationMinutes,
   isEndAfterStart,
   toDateInputValue,
   toDateTimeInputValue,
@@ -10,7 +8,6 @@ import type { ItemType } from '@/lib/types';
 export type EditableTimingState = {
   due_date: string | null;
   end_at: string | null;
-  estimated_minutes: number | null;
   is_all_day: boolean;
   start_at: string | null;
   type: string;
@@ -24,34 +21,12 @@ export type TimingFieldVisibility = {
   startDateOnly: boolean;
 };
 
-function resolveDurationMinutes(estimatedMinutes: number | null) {
-  return typeof estimatedMinutes === 'number' && Number.isFinite(estimatedMinutes) && estimatedMinutes > 0
-    ? estimatedMinutes
-    : DEFAULT_EVENT_MINUTES;
-}
-
 function buildRoundedNow() {
   const now = new Date();
   now.setSeconds(0, 0);
   const roundedMinutes = Math.ceil(now.getMinutes() / 30) * 30;
   now.setMinutes(roundedMinutes);
   return now;
-}
-
-function syncTimedDuration<T extends EditableTimingState>(value: T): T {
-  if (value.type !== 'event' || value.is_all_day) {
-    return value;
-  }
-
-  const durationMinutes = getDurationMinutes(value.start_at, value.end_at);
-  if (!durationMinutes) {
-    return value;
-  }
-
-  return {
-    ...value,
-    estimated_minutes: durationMinutes,
-  };
 }
 
 export function ensureEndAfterStartValue(startAt: string | null, endAt: string | null) {
@@ -80,16 +55,6 @@ export function buildDefaultStartAt(
   }
 
   return toDateTimeInputValue(buildRoundedNow());
-}
-
-export function buildDefaultEndAt(startAt: string, estimatedMinutes: number | null) {
-  const start = new Date(startAt);
-  if (Number.isNaN(start.getTime())) {
-    return null;
-  }
-
-  start.setMinutes(start.getMinutes() + resolveDurationMinutes(estimatedMinutes));
-  return toDateTimeInputValue(start);
 }
 
 export function deriveDueDateFromStart(
@@ -163,16 +128,14 @@ export function applyTypeChange<T extends EditableTimingState>(value: T, nextTyp
   }
 
   const nextStart = buildDefaultStartAt(value);
-  const suggestedEnd = buildDefaultEndAt(nextStart, value.estimated_minutes);
-
-  return syncTimedDuration({
+  return {
     ...value,
     due_date: null,
-    end_at: ensureEndAfterStartValue(nextStart, suggestedEnd),
+    end_at: null,
     is_all_day: false,
     start_at: nextStart,
     type: 'event',
-  });
+  };
 }
 
 export function applyAllDayChange<T extends EditableTimingState>(value: T, nextIsAllDay: boolean): T {
@@ -192,14 +155,13 @@ export function applyAllDayChange<T extends EditableTimingState>(value: T, nextI
     };
   }
 
-  const suggestedEnd = value.end_at ?? buildDefaultEndAt(nextStart, value.estimated_minutes);
-  return syncTimedDuration({
+  return {
     ...value,
     due_date: null,
-    end_at: ensureEndAfterStartValue(nextStart, suggestedEnd),
+    end_at: ensureEndAfterStartValue(nextStart, value.end_at),
     is_all_day: false,
     start_at: nextStart,
-  });
+  };
 }
 
 export function applyStartAtChange<T extends EditableTimingState>(value: T, nextStart: string): T {
@@ -216,12 +178,12 @@ export function applyStartAtChange<T extends EditableTimingState>(value: T, next
     };
   }
 
-  return syncTimedDuration({
+  return {
     ...value,
     due_date: null,
     end_at: ensureEndAfterStartValue(nextStart, value.end_at),
     start_at: nextStart,
-  });
+  };
 }
 
 export function applyEndAtChange<T extends EditableTimingState>(value: T, nextEnd: string): T {
@@ -229,11 +191,11 @@ export function applyEndAtChange<T extends EditableTimingState>(value: T, nextEn
     return value;
   }
 
-  return syncTimedDuration({
+  return {
     ...value,
     due_date: null,
     end_at: ensureEndAfterStartValue(value.start_at, nextEnd),
-  });
+  };
 }
 
 export function sanitizeTimingForSubmission<T extends EditableTimingState>(value: T): T {
@@ -257,9 +219,9 @@ export function sanitizeTimingForSubmission<T extends EditableTimingState>(value
     };
   }
 
-  return syncTimedDuration({
+  return {
     ...value,
     due_date: null,
     is_all_day: false,
-  });
+  };
 }

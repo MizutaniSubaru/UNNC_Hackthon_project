@@ -28,7 +28,6 @@ export type ParseResult = {
   confidence: number;
   due_date: string | null;
   end_at: string | null;
-  estimated_minutes: number | null;
   group_key: GroupKey;
   is_all_day: boolean;
   location: string;
@@ -41,7 +40,6 @@ export type ParseResult = {
 };
 
 export type ParseExtractedFields = {
-  duration_minutes: number | null;
   location: string;
   priority: Priority;
   time: {
@@ -65,7 +63,6 @@ export type ParseResponse = {
 export type CreateItemPayload = {
   due_date: string | null;
   end_at: string | null;
-  estimated_minutes: number | null;
   group_key: GroupKey;
   is_all_day: boolean;
   location: string | null;
@@ -153,7 +150,6 @@ export type LocaleCopy = {
   labels: {
     dueDate: string;
     end: string;
-    estimatedMinutes: string;
     group: string;
     location: string;
     notes: string;

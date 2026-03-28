@@ -46,12 +46,6 @@ function summarizeDiff(previous: Item, next: Item) {
     changes.push(`status: ${previous.status} -> ${next.status}`);
   }
 
-  if (previous.estimated_minutes !== next.estimated_minutes) {
-    changes.push(
-      `duration: ${formatValue(previous.estimated_minutes)} -> ${formatValue(next.estimated_minutes)}`
-    );
-  }
-
   return changes;
 }
 
@@ -62,7 +56,6 @@ export function buildCreatedLog(item: Item) {
       after: {
         due_date: item.due_date,
         end_at: item.end_at,
-        estimated_minutes: item.estimated_minutes,
         group_key: item.group_key,
         is_all_day: item.is_all_day,
         location: item.location,
@@ -111,7 +104,6 @@ export function buildUpdatedLog(previous: Item, next: Item) {
       next: {
         due_date: next.due_date,
         end_at: next.end_at,
-        estimated_minutes: next.estimated_minutes,
         group_key: next.group_key,
         location: next.location,
         priority: next.priority,
@@ -121,7 +113,6 @@ export function buildUpdatedLog(previous: Item, next: Item) {
       previous: {
         due_date: previous.due_date,
         end_at: previous.end_at,
-        estimated_minutes: previous.estimated_minutes,
         group_key: previous.group_key,
         location: previous.location,
         priority: previous.priority,

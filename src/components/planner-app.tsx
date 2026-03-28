@@ -1562,7 +1562,6 @@ export function PlannerApp() {
         body: JSON.stringify({
           due_date: nextItem.due_date,
           end_at: nextItem.end_at ? toIsoOrNull(nextItem.end_at) : null,
-          estimated_minutes: nextItem.estimated_minutes,
           group_key: nextItem.group_key,
           is_all_day: nextItem.is_all_day,
           location: nextItem.location,

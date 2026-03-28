@@ -59,7 +59,7 @@ Supported MiniMax text models in the current provider chain:
 - `MiniMax-M2`
 
 If no AI key is configured, the app falls back to a lightweight heuristic parser for local testing.
-When AI is configured, natural-language parsing always calls the parse model so title, time, location, duration, and priority are produced from the stronger reasoning path. Search can still use local shortcuts where appropriate.
+When AI is configured, natural-language parsing always calls the parse model so title, time, location, and priority are produced from the stronger reasoning path. Search can still use local shortcuts where appropriate.
 
 ## Supabase Setup
 

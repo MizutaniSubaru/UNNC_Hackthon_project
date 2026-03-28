@@ -4,12 +4,11 @@ import {
   requestAiJson,
 } from '@/lib/ai-provider';
 import {
-  DEFAULT_EVENT_MINUTES,
   DEFAULT_TIMEZONE,
   MONTH_NAMES_EN,
   PRIORITIES,
 } from '@/lib/constants';
-import { addMinutes, getDurationMinutes } from '@/lib/time';
+import { addMinutes } from '@/lib/time';
 import type {
   GroupKey,
   ParseExtractedFields,
@@ -23,7 +22,6 @@ type PartialParseResult = Partial<ParseResult> & {
   confidence?: unknown;
   due_date?: unknown;
   end_at?: unknown;
-  estimated_minutes?: unknown;
   group_key?: unknown;
   is_all_day?: unknown;
   location?: unknown;
@@ -127,21 +125,6 @@ function sanitizePriority(value: unknown): Priority {
   return typeof value === 'string' && PRIORITY_SET.has(value as Priority)
     ? (value as Priority)
     : 'medium';
-}
-
-function sanitizeMinutes(value: unknown, fallback: number | null) {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return Math.round(value);
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return Math.round(parsed);
-    }
-  }
-
-  return fallback;
 }
 
 function normalizeSpacing(text: string) {
@@ -253,7 +236,7 @@ function parseExplicitDurationMinutes(text: string) {
     return Number(chineseHourMatch[1]) * 60;
   }
 
-  const chineseMinuteMatch = normalized.match(/(\d{1,3})\s*(?:\u5206\u949f|\u5206)\b/u);
+  const chineseMinuteMatch = normalized.match(/(\d{1,3})\s*(?:\u5206\u949f|\u5206)(?!\d)/u);
   if (chineseMinuteMatch) {
     return Number(chineseMinuteMatch[1]);
   }
@@ -385,29 +368,6 @@ function inferPriority(text: string): Priority {
   }
 
   return 'low';
-}
-
-function inferEstimatedMinutes(text: string, type: 'todo' | 'event') {
-  const explicitDuration = parseExplicitDurationMinutes(text);
-  if (explicitDuration) {
-    return explicitDuration;
-  }
-
-  const normalized = text.toLowerCase();
-
-  if (/meeting|\u5f00\u4f1a|\u8ba8\u8bba|\u6c9f\u901a|call/u.test(normalized)) {
-    return 60;
-  }
-
-  if (/essay|assignment|\u8bba\u6587|\u4f5c\u4e1a|coding|\u7f16\u7801|\u590d\u4e60/u.test(normalized)) {
-    return 120;
-  }
-
-  if (/buy|\u4e70|grocer|\u6253\u5370|\u6253\u5370\u7eb8/u.test(normalized)) {
-    return 30;
-  }
-
-  return type === 'event' ? DEFAULT_EVENT_MINUTES : 45;
 }
 
 function formatIsoDate(date: Date) {
@@ -861,25 +821,20 @@ export function analyzeTemporalIntent(
   };
 }
 
-function reconcileTimedEventFields(
+function resolveTimedEventEndAt(
   startAt: string | null,
   endAt: string | null,
-  estimatedMinutes: number | null
+  explicitDurationMinutes: number | null
 ) {
-  const durationMinutes = getDurationMinutes(startAt, endAt);
-
-  if (durationMinutes) {
-    return {
-      endAt,
-      estimatedMinutes: durationMinutes,
-    };
+  if (endAt) {
+    return endAt;
   }
 
-  const normalizedEstimatedMinutes = estimatedMinutes ?? DEFAULT_EVENT_MINUTES;
-  return {
-    endAt: startAt ? endAt ?? addMinutes(startAt, normalizedEstimatedMinutes) : endAt,
-    estimatedMinutes: normalizedEstimatedMinutes,
-  };
+  if (!startAt || !explicitDurationMinutes) {
+    return endAt;
+  }
+
+  return addMinutes(startAt, explicitDurationMinutes);
 }
 
 function shouldRequestConfirmationForTimedEvent(
@@ -902,19 +857,12 @@ function toTemporalParseResult(
   const type = temporalIntent.kind === 'specific_day' || temporalIntent.kind === 'specific_day_with_time'
     ? 'event'
     : 'todo';
-  const estimatedMinutes = inferEstimatedMinutes(text, type);
+  const explicitDurationMinutes = parseExplicitDurationMinutes(text);
   const startAt = temporalIntent.startAt;
   const rawEndAt =
     startAt && temporalIntent.kind === 'specific_day_with_time'
-      ? temporalIntent.endAt ?? addMinutes(startAt, estimatedMinutes)
+      ? resolveTimedEventEndAt(startAt, temporalIntent.endAt, explicitDurationMinutes)
       : null;
-  const timing =
-    type === 'event' && temporalIntent.kind === 'specific_day_with_time'
-      ? reconcileTimedEventFields(startAt, rawEndAt, estimatedMinutes)
-      : {
-        endAt: rawEndAt,
-        estimatedMinutes,
-      };
   const needsConfirmation =
     temporalIntent.needsConfirmation ||
     shouldRequestConfirmationForTimedEvent(temporalIntent, text);
@@ -932,12 +880,11 @@ function toTemporalParseResult(
           ? 0.92
           : temporalIntent.kind === 'specific_day'
             ? 0.88
-            : temporalIntent.kind === 'vague_window'
+          : temporalIntent.kind === 'vague_window'
               ? 0.6
               : 0.78,
       due_date: temporalIntent.kind === 'specific_day' ? temporalIntent.dueDate : null,
-      end_at: type === 'event' ? timing.endAt : null,
-      estimated_minutes: timing.estimatedMinutes,
+      end_at: type === 'event' ? rawEndAt : null,
       group_key: inferGroup(text),
       is_all_day: temporalIntent.kind === 'specific_day',
       location: inferLocation(text),
@@ -961,7 +908,8 @@ export function fallbackParseInput(
 
 function applyTemporalIntentToResult(
   input: ParseResult,
-  temporalIntent: TemporalIntent
+  temporalIntent: TemporalIntent,
+  text: string
 ): ParseResult {
   if (temporalIntent.kind === 'vague_window') {
     return {
@@ -990,19 +938,18 @@ function applyTemporalIntentToResult(
   }
 
   if (temporalIntent.kind === 'specific_day_with_time') {
-    const timing = reconcileTimedEventFields(
-      input.start_at ?? temporalIntent.startAt,
-      input.end_at ?? temporalIntent.endAt,
-      input.estimated_minutes ?? DEFAULT_EVENT_MINUTES
-    );
     const startAt = input.start_at ?? temporalIntent.startAt;
+    const endAt = resolveTimedEventEndAt(
+      startAt,
+      input.end_at ?? temporalIntent.endAt,
+      parseExplicitDurationMinutes(text)
+    );
 
     return {
       ...input,
       ambiguity_reason: null,
       due_date: null,
-      end_at: timing.endAt,
-      estimated_minutes: timing.estimatedMinutes,
+      end_at: endAt,
       is_all_day: false,
       needs_confirmation: input.needs_confirmation,
       start_at: startAt,
@@ -1032,16 +979,14 @@ function applyTemporalIntentToResult(
   }
 
   if (input.start_at && !input.end_at) {
-    const timing = reconcileTimedEventFields(
-      input.start_at,
-      input.end_at,
-      input.estimated_minutes ?? DEFAULT_EVENT_MINUTES
-    );
     return {
       ...input,
       due_date: null,
-      end_at: timing.endAt,
-      estimated_minutes: timing.estimatedMinutes,
+      end_at: resolveTimedEventEndAt(
+        input.start_at,
+        input.end_at,
+        parseExplicitDurationMinutes(text)
+      ),
       type: 'event',
     };
   }
@@ -1064,22 +1009,10 @@ export function normalizeParseResult(
       ? titleFromText(payload.title.trim())
       : fallback.title;
   const type = fallback.type;
-  const estimatedMinutes = sanitizeMinutes(
-    payload?.estimated_minutes,
-    fallback.estimated_minutes
-  );
   const startAt: string | null = fallback.start_at;
-  let endAt: string | null = fallback.end_at;
+  const endAt: string | null = fallback.end_at;
   const dueDate: string | null = fallback.due_date;
   const isAllDay = fallback.is_all_day;
-  const timing =
-    type === 'event' && !isAllDay
-      ? reconcileTimedEventFields(startAt, endAt, estimatedMinutes)
-      : {
-        endAt,
-        estimatedMinutes,
-      };
-  endAt = timing.endAt;
   const location =
     typeof payload?.location === 'string'
       ? locationFromMatch(payload.location)
@@ -1099,7 +1032,6 @@ export function normalizeParseResult(
         : fallback.confidence,
     due_date: dueDate,
     end_at: endAt,
-    estimated_minutes: timing.estimatedMinutes,
     group_key: fallback.group_key,
     is_all_day: isAllDay,
     location,
@@ -1115,7 +1047,7 @@ export function normalizeParseResult(
     type,
   } satisfies ParseResult;
 
-  return applyTemporalIntentToResult(candidate, temporalIntent);
+  return applyTemporalIntentToResult(candidate, temporalIntent, text);
 }
 
 function buildParseAiMessages(input: {
@@ -1132,7 +1064,7 @@ function buildParseAiMessages(input: {
       content: `
 You are a bilingual AI planning assistant.
 Return only a JSON object with these keys:
-type, title, location, notes, group_key, priority, estimated_minutes, start_at, end_at, due_date, is_all_day, needs_confirmation, ambiguity_reason, confidence.
+type, title, location, notes, group_key, priority, start_at, end_at, due_date, is_all_day, needs_confirmation, ambiguity_reason, confidence.
 
 Rules:
 - group_key must be one of: study, work, life, health, other.
@@ -1142,10 +1074,11 @@ Rules:
 - Use ISO 8601 for start_at/end_at. Use YYYY-MM-DD for due_date.
 - If the user gives a date but no time, create an all-day event with due_date set and start_at/end_at null.
 - If the text is ambiguous like "next week", set needs_confirmation true and explain ambiguity_reason.
-- If an event has a start time but no end time, estimate estimated_minutes and derive a reasonable end_at.
+- If the user gives a start time with an explicit duration, convert it into end_at.
+- If an event has a start time but no explicit end time or duration, keep end_at null.
 - Understand common Chinese colloquial time phrases: "明天凌晨一点半到三点半" means 01:30 to 03:30 on the referenced day.
 - Understand common Chinese duration phrases: "两个半小时", "两小时半", and "俩小时半" all mean 150 minutes.
-- If the user only gives a duration without a start time, keep start_at/end_at null and fill estimated_minutes.
+- If the user only gives a duration without a start time, keep start_at/end_at null and ignore the duration.
 - Keep title concise. location and notes can be empty.
 - Respect locale ${locale} and timezone ${timezone}.
 - Current timestamp is ${now}.
@@ -1277,7 +1210,6 @@ export function buildExtractedFields(
   timezone = DEFAULT_TIMEZONE
 ): ParseExtractedFields {
   return {
-    duration_minutes: result.estimated_minutes,
     location: result.location,
     priority: result.priority,
     time: {

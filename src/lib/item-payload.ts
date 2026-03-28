@@ -1,5 +1,4 @@
-import { DEFAULT_EVENT_MINUTES } from '@/lib/constants';
-import { addMinutes, getDurationMinutes, toDateInputValue } from '@/lib/time';
+import { toDateInputValue } from '@/lib/time';
 import type {
   CreateItemPayload,
   GroupKey,
@@ -29,50 +28,6 @@ function asGroupKey(value: unknown): GroupKey {
 
 function asType(value: unknown): ItemType {
   return value === 'event' ? 'event' : 'todo';
-}
-
-function asMinutes(value: unknown, fallback: number | null = null) {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return Math.round(value);
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return Math.round(parsed);
-    }
-  }
-
-  return fallback;
-}
-
-function deriveEndAt(startAt: string | null, estimatedMinutes: number | null) {
-  if (!startAt) {
-    return null;
-  }
-
-  return addMinutes(startAt, estimatedMinutes ?? DEFAULT_EVENT_MINUTES);
-}
-
-function reconcileTimedEventFields(
-  startAt: string | null,
-  endAt: string | null,
-  estimatedMinutes: number | null
-) {
-  const durationMinutes = getDurationMinutes(startAt, endAt);
-
-  if (durationMinutes) {
-    return {
-      endAt,
-      estimatedMinutes: durationMinutes,
-    };
-  }
-
-  const normalizedEstimatedMinutes = estimatedMinutes ?? DEFAULT_EVENT_MINUTES;
-  return {
-    endAt: endAt ?? deriveEndAt(startAt, normalizedEstimatedMinutes),
-    estimatedMinutes: normalizedEstimatedMinutes,
-  };
 }
 
 function normalizeDueDate(type: ItemType, isAllDay: boolean, dueDate: string | null, startAt: string | null) {
@@ -112,25 +67,16 @@ function assertValidEventRange(
 export function normalizeCreatePayload(payload: Partial<CreateItemPayload>) {
   const type = asType(payload.type);
   const isAllDay = type === 'event' && Boolean(payload.is_all_day);
-  const estimatedMinutes = asMinutes(payload.estimated_minutes, type === 'event' ? 60 : 45);
   const startAt = asNullableString(payload.start_at);
   const dueDate = asNullableString(payload.due_date);
-  const rawEndAt = type === 'event' && !isAllDay ? asNullableString(payload.end_at) : null;
-  const timing =
-    type === 'event' && !isAllDay
-      ? reconcileTimedEventFields(startAt, rawEndAt, estimatedMinutes)
-      : {
-          endAt: null,
-          estimatedMinutes,
-        };
-  const endAt = timing.endAt;
+  const endAt = type === 'event' && !isAllDay ? asNullableString(payload.end_at) : null;
 
   assertValidEventRange(type, isAllDay, startAt, endAt);
 
   return {
     due_date: normalizeDueDate(type, isAllDay, dueDate, startAt),
     end_at: endAt,
-    estimated_minutes: timing.estimatedMinutes,
+    estimated_minutes: null,
     group_key: asGroupKey(payload.group_key),
     is_all_day: isAllDay,
     location: asNullableString(payload.location),
@@ -162,10 +108,6 @@ export function normalizeUpdatePayload(
   const isAllDay =
     type === 'event' &&
     (typeof payload.is_all_day === 'boolean' ? payload.is_all_day : currentItem.is_all_day);
-  const estimatedMinutes = asMinutes(
-    payload.estimated_minutes,
-    currentItem.estimated_minutes
-  );
   const startAt =
     payload.start_at !== undefined ? asNullableString(payload.start_at) : currentItem.start_at;
   const dueDate =
@@ -176,21 +118,14 @@ export function normalizeUpdatePayload(
         ? asNullableString(payload.end_at)
         : currentItem.end_at
       : null;
-  const timing =
-    type === 'event' && !isAllDay
-      ? reconcileTimedEventFields(startAt, rawEndAt, estimatedMinutes)
-      : {
-          endAt: null,
-          estimatedMinutes,
-        };
-  const endAt = timing.endAt;
+  const endAt = rawEndAt;
 
   assertValidEventRange(type, isAllDay, startAt, endAt);
 
   return {
     due_date: normalizeDueDate(type, isAllDay, dueDate, startAt),
     end_at: endAt,
-    estimated_minutes: timing.estimatedMinutes,
+    estimated_minutes: null,
     group_key:
       payload.group_key !== undefined
         ? asGroupKey(payload.group_key)
