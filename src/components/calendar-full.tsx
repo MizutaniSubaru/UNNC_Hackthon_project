@@ -84,61 +84,25 @@ function MonthEventCard({
   crossDay,
   title,
   tooltip,
-  groupKey,
 }: {
   crossDay: boolean;
   title: string;
   tooltip: string;
-  groupKey?: string;
 }) {
   const className = crossDay
     ? 'planner-calendar-month-event planner-calendar-month-event--cross-day'
     : 'planner-calendar-month-event';
 
-  let backgroundColor, borderColor, accentColor;
-
-  switch (groupKey) {
-    case 'study':
-      backgroundColor = 'linear-gradient(135deg, rgb(119 169 255 / 98%) 0%, rgba(230, 240, 255, 0.96) 100%)';
-      borderColor = 'rgba(178, 197, 255, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #4f7cff 100%)';
-      break;
-    case 'work':
-      backgroundColor = 'linear-gradient(135deg, rgb(255 130 100 / 98%) 0%, rgba(255, 235, 230, 0.96) 100%)';
-      borderColor = 'rgba(255, 190, 175, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #ff6b4a 100%)';
-      break;
-    case 'life':
-      backgroundColor = 'linear-gradient(135deg, rgb(90 200 140 / 98%) 0%, rgba(225, 245, 235, 0.96) 100%)';
-      borderColor = 'rgba(168, 220, 196, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #39b07a 100%)';
-      break;
-    case 'health':
-      backgroundColor = 'linear-gradient(135deg, rgb(250 180 80 / 98%) 0%, rgba(255, 240, 215, 0.96) 100%)';
-      borderColor = 'rgba(251, 216, 158, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #f5a623 100%)';
-      break;
-    case 'other':
-    default:
-      backgroundColor = 'linear-gradient(135deg, rgb(150 140 250 / 98%) 0%, rgba(238, 235, 253, 0.96) 100%)';
-      borderColor = 'rgba(197, 191, 251, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #7b6ef6 100%)';
-      break;
-  }
-
   return (
-    <div aria-label={tooltip} className={className} title={tooltip} style={{ background: backgroundColor, borderColor: borderColor, borderWidth: 1, borderStyle: 'solid' }}>
-      <span aria-hidden="true" className="planner-calendar-month-event__accent" style={{ background: accentColor }} />
+    <div aria-label={tooltip} className={className} title={tooltip}>
+      <span aria-hidden="true" className="planner-calendar-month-event__accent" />
       <span className="planner-calendar-month-event__title">{title}</span>
     </div>
   );
 }
 
 type TimeGridEventSurfaceProps = {
-  accentColor: string;
   ariaHidden?: boolean;
-  backgroundColor: string;
-  borderColor: string;
   className: string;
   frameRef?: React.Ref<HTMLDivElement>;
   locationText: string;
@@ -148,10 +112,7 @@ type TimeGridEventSurfaceProps = {
 };
 
 function TimeGridEventSurface({
-  accentColor,
   ariaHidden,
-  backgroundColor,
-  borderColor,
   className,
   frameRef,
   locationText,
@@ -160,18 +121,8 @@ function TimeGridEventSurface({
   title,
 }: TimeGridEventSurfaceProps) {
   return (
-    <div
-      aria-hidden={ariaHidden}
-      ref={frameRef}
-      className={className}
-      style={{
-        background: backgroundColor,
-        borderColor,
-        borderStyle: 'solid',
-        borderWidth: 1,
-      }}
-    >
-      <span aria-hidden="true" className="planner-calendar-week-event__accent" style={{ background: accentColor }} />
+    <div aria-hidden={ariaHidden} ref={frameRef} className={className}>
+      <span aria-hidden="true" className="planner-calendar-week-event__accent" />
       <div className="planner-calendar-week-event__body">
         <span className="planner-calendar-week-event__title">{title}</span>
         {showMeta ? (
@@ -196,7 +147,6 @@ type TimeGridEventCardProps = {
   timeLabel: string;
   title: string;
   tooltip: string;
-  groupKey?: string;
 };
 
 function TimeGridEventCard({
@@ -204,7 +154,6 @@ function TimeGridEventCard({
   timeLabel,
   title,
   tooltip,
-  groupKey,
 }: TimeGridEventCardProps) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const measureRef = useRef<HTMLDivElement | null>(null);
@@ -260,37 +209,6 @@ function TimeGridEventCard({
     };
   }, [locationText, timeLabel, title]);
 
-  let backgroundColor, borderColor, accentColor;
-
-  switch (groupKey) {
-    case 'study':
-      backgroundColor = 'linear-gradient(140deg, rgb(51 97 188 / 98%) 0%, rgba(235, 242, 255, 0.98) 100%)';
-      borderColor = 'rgba(178, 197, 255, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #4f7cff 100%)';
-      break;
-    case 'work':
-      backgroundColor = 'linear-gradient(140deg, rgb(220 70 40 / 98%) 0%, rgba(255, 225, 219, 0.98) 100%)';
-      borderColor = 'rgba(255, 190, 175, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #ff6b4a 100%)';
-      break;
-    case 'life':
-      backgroundColor = 'linear-gradient(140deg, rgb(40 150 95 / 98%) 0%, rgba(215, 239, 228, 0.98) 100%)';
-      borderColor = 'rgba(168, 220, 196, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #39b07a 100%)';
-      break;
-    case 'health':
-      backgroundColor = 'linear-gradient(140deg, rgb(210 130 20 / 98%) 0%, rgba(253, 237, 211, 0.98) 100%)';
-      borderColor = 'rgba(251, 216, 158, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #f5a623 100%)';
-      break;
-    case 'other':
-    default:
-      backgroundColor = 'linear-gradient(140deg, rgb(105 85 210 / 98%) 0%, rgba(229, 226, 253, 0.98) 100%)';
-      borderColor = 'rgba(197, 191, 251, 0.95)';
-      accentColor = 'linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, #7b6ef6 100%)';
-      break;
-  }
-
   return (
     <div
       aria-label={tooltip}
@@ -298,9 +216,6 @@ function TimeGridEventCard({
       title={tooltip}
     >
       <TimeGridEventSurface
-        accentColor={accentColor}
-        backgroundColor={backgroundColor}
-        borderColor={borderColor}
         className={`planner-calendar-week-event__frame${showMeta ? '' : ' planner-calendar-week-event__frame--title-only'}`}
         frameRef={frameRef}
         locationText={locationText}
@@ -309,10 +224,7 @@ function TimeGridEventCard({
         title={title}
       />
       <TimeGridEventSurface
-        accentColor={accentColor}
         ariaHidden={true}
-        backgroundColor={backgroundColor}
-        borderColor={borderColor}
         className="planner-calendar-week-event__measure"
         frameRef={measureRef}
         locationText={locationText}
@@ -412,12 +324,9 @@ export function CalendarFull({
         .filter(Boolean)
         .join(' | ');
       const isCrossDaySegment = args.event.allDay && !(args.isStart && args.isEnd);
-      const groupKey = args.event.classNames
-        .find((className) => className.startsWith('planner-calendar-event--'))
-        ?.replace('planner-calendar-event--', '');
 
       if (args.view.type === 'dayGridMonth' || args.event.allDay) {
-        return <MonthEventCard crossDay={isCrossDaySegment} title={title} tooltip={tooltip} groupKey={groupKey} />;
+        return <MonthEventCard crossDay={isCrossDaySegment} title={title} tooltip={tooltip} />;
       }
 
       return (
@@ -426,7 +335,6 @@ export function CalendarFull({
           timeLabel={eventProps.timeLabel}
           title={title}
           tooltip={tooltip}
-          groupKey={groupKey}
         />
       );
     },
