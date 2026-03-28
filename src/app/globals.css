@@ -492,41 +492,43 @@ button:disabled {
 }
 
 .quote-rotator__line--lg {
-  font-size: 1.03rem;
+  font-size: 1.25rem;
 }
 
 .quote-rotator__line--md {
-  font-size: 0.95rem;
+  font-size: 1.125rem;
 }
 
 .quote-rotator__line--sm {
-  font-size: 0.89rem;
+  font-size: 1.05rem;
   line-height: 1.4;
 }
 
 .quote-rotator__line--xs {
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   line-height: 1.34;
 }
 
-.quote-rotator__line--in {
-  animation: quote-rotator-fade-in 360ms ease both;
+.quote-char {
+  display: inline-block;
+  opacity: 0;
+  white-space: pre-wrap;
+  animation: char-fade-in 300ms ease forwards;
+}
+
+@keyframes char-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .quote-rotator__line--out {
-  animation: quote-rotator-fade-out 360ms ease both;
-}
-
-@keyframes quote-rotator-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  animation: quote-rotator-fade-out 360ms ease forwards;
 }
 
 @keyframes quote-rotator-fade-out {
@@ -1015,7 +1017,7 @@ button:disabled {
     animation-duration: 120ms;
   }
 
-  .quote-rotator__line--in,
+  .quote-char,
   .quote-rotator__line--out {
     animation-duration: 120ms;
   }

@@ -97,7 +97,7 @@ export function QuoteRotator({ locale }: QuoteRotatorProps) {
                     const first = pickNextQuote(normalized, null, []);
                     setActiveQuote(first);
                     recentIdsRef.current = first ? [first.id] : [];
-                    setPhaseClass('quote-rotator__line--in');
+                    setPhaseClass('');
                 }
             } catch {
                 if (!cancelled) {
@@ -119,34 +119,6 @@ export function QuoteRotator({ locale }: QuoteRotatorProps) {
         };
     }, []);
 
-    useEffect(() => {
-        if (quotes.length <= 1 || !activeQuote) {
-            return;
-        }
-
-        const cycleTimer = window.setInterval(() => {
-            setPhaseClass('quote-rotator__line--out');
-            swapTimerRef.current = window.setTimeout(() => {
-                setActiveQuote((current) => {
-                    const next = pickNextQuote(quotes, current?.id ?? null, recentIdsRef.current);
-                    if (next) {
-                        const appended = [...recentIdsRef.current, next.id];
-                        recentIdsRef.current = appended.slice(-16);
-                    }
-                    return next;
-                });
-                setPhaseClass('quote-rotator__line--in');
-            }, FADE_DURATION_MS);
-        }, ROTATE_INTERVAL_MS);
-
-        return () => {
-            window.clearInterval(cycleTimer);
-            if (swapTimerRef.current !== null) {
-                window.clearTimeout(swapTimerRef.current);
-            }
-        };
-    }, [activeQuote, quotes]);
-
     const displayText = useMemo(() => {
         if (loading) {
             return isChinese ? '正在加载语录中…' : 'Loading quote...';
@@ -160,6 +132,38 @@ export function QuoteRotator({ locale }: QuoteRotatorProps) {
 
         return `${activeQuote.quote} - ${normalizeAnimeTitle(activeQuote.anime)}`;
     }, [activeQuote, isChinese, loading]);
+
+    useEffect(() => {
+        if (quotes.length <= 1 || !activeQuote) {
+            return;
+        }
+
+        const charsLength = Array.from(displayText).length;
+        // Wait for all chars to animate (charsLength * 60ms) + 300ms char animation + 2000ms stay
+        const displayDuration = charsLength * 60 + 300 + 2000;
+
+        const cycleTimer = window.setTimeout(() => {
+            setPhaseClass('quote-rotator__line--out');
+            swapTimerRef.current = window.setTimeout(() => {
+                setActiveQuote((current) => {
+                    const next = pickNextQuote(quotes, current?.id ?? null, recentIdsRef.current);
+                    if (next) {
+                        const appended = [...recentIdsRef.current, next.id];
+                        recentIdsRef.current = appended.slice(-16);
+                    }
+                    return next;
+                });
+                setPhaseClass('');
+            }, FADE_DURATION_MS);
+        }, displayDuration);
+
+        return () => {
+            window.clearTimeout(cycleTimer);
+            if (swapTimerRef.current !== null) {
+                window.clearTimeout(swapTimerRef.current);
+            }
+        };
+    }, [activeQuote, quotes, displayText]);
 
     const sizeClass = textSizeClass(displayText.length);
 
@@ -175,7 +179,17 @@ export function QuoteRotator({ locale }: QuoteRotatorProps) {
             </div>
 
             <div className="quote-rotator__body">
-                <p className={`quote-rotator__line ${sizeClass} ${phaseClass}`}>{displayText}</p>
+                <p className={`quote-rotator__line ${sizeClass} ${phaseClass}`}>
+                    {Array.from(displayText).map((char, index) => (
+                        <span
+                            key={`${activeQuote?.id || 'static'}-${index}`}
+                            className="quote-char"
+                            style={{ animationDelay: `${index * 60}ms` }}
+                        >
+                            {char}
+                        </span>
+                    ))}
+                </p>
             </div>
         </section>
     );
