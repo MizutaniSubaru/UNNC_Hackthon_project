@@ -4,6 +4,7 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -116,6 +117,9 @@ type SearchResultsPanelProps = {
   searching: boolean;
   timeRangeLabel: string | null;
 };
+
+const MONTH_CALENDAR_VIEW = 'dayGridMonth';
+const WEEK_CALENDAR_VIEW = 'timeGridTwoDayRail';
 
 function resolveLocale() {
   if (typeof navigator === 'undefined') {
@@ -1133,7 +1137,8 @@ export function PlannerApp() {
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [searchRangeLabel, setSearchRangeLabel] = useState<string | null>(null);
   const [searchFallback, setSearchFallback] = useState(false);
-  const [schedulePanelHeight, setSchedulePanelHeight] = useState<number | null>(null);
+  const [calendarViewType, setCalendarViewType] = useState(MONTH_CALENDAR_VIEW);
+  const [monthSchedulePanelHeight, setMonthSchedulePanelHeight] = useState<number | null>(null);
   const [showPomodoroMenu, setShowPomodoroMenu] = useState(false);
   const [focusMinutes, setFocusMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
@@ -1144,12 +1149,24 @@ export function PlannerApp() {
   const [isPomodoroPaused, setIsPomodoroPaused] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const bottomGridRef = useRef<HTMLElement | null>(null);
+  const calendarViewTypeRef = useRef(MONTH_CALENDAR_VIEW);
+  const previousCalendarViewTypeRef = useRef(MONTH_CALENDAR_VIEW);
   const pomodoroMenuRef = useRef<HTMLDivElement | null>(null);
 
   const copy = resolveCopy(locale);
 
   const closePomodoroMenu = useCallback(() => {
     setShowPomodoroMenu(false);
+  }, []);
+
+  const handleCalendarViewTypeChange = useCallback((nextViewType: string) => {
+    calendarViewTypeRef.current = nextViewType;
+    setCalendarViewType((current) => (current === nextViewType ? current : nextViewType));
+  }, []);
+
+  const syncMonthSchedulePanelHeight = useCallback((schedulePanel: HTMLElement) => {
+    const nextHeight = Math.ceil(schedulePanel.getBoundingClientRect().height);
+    setMonthSchedulePanelHeight((current) => (current === nextHeight ? current : nextHeight));
   }, []);
 
   const startPomodoroTimer = useCallback(() => {
@@ -1212,8 +1229,11 @@ export function PlannerApp() {
     let frameId: number | null = null;
 
     const syncScheduleHeight = () => {
-      const nextHeight = Math.ceil(schedulePanel.getBoundingClientRect().height);
-      setSchedulePanelHeight((current) => (current === nextHeight ? current : nextHeight));
+      if (calendarViewTypeRef.current !== MONTH_CALENDAR_VIEW) {
+        return;
+      }
+
+      syncMonthSchedulePanelHeight(schedulePanel);
     };
 
     syncScheduleHeight();
@@ -1233,7 +1253,57 @@ export function PlannerApp() {
       }
       observer.disconnect();
     };
-  }, [configured]);
+  }, [configured, syncMonthSchedulePanelHeight]);
+
+  useEffect(() => {
+    if (calendarViewType !== MONTH_CALENDAR_VIEW || typeof window === 'undefined') {
+      return;
+    }
+
+    const grid = bottomGridRef.current;
+    if (!grid) {
+      return;
+    }
+
+    const schedulePanel = grid.querySelector('.planner-panel--calendar');
+    if (!(schedulePanel instanceof HTMLElement)) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      syncMonthSchedulePanelHeight(schedulePanel);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [calendarViewType, syncMonthSchedulePanelHeight]);
+
+  useLayoutEffect(() => {
+    const previousViewType = previousCalendarViewTypeRef.current;
+    previousCalendarViewTypeRef.current = calendarViewType;
+
+    if (previousViewType !== MONTH_CALENDAR_VIEW || calendarViewType !== WEEK_CALENDAR_VIEW) {
+      return;
+    }
+
+    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1181px)').matches) {
+      return;
+    }
+
+    const grid = bottomGridRef.current;
+    if (!grid) {
+      return;
+    }
+
+    const nextTop = Math.max(
+      0,
+      Math.round(grid.getBoundingClientRect().top + window.scrollY)
+    );
+    window.scrollTo({
+      top: nextTop,
+    });
+  }, [calendarViewType]);
 
   useEffect(() => {
     if (!showPomodoroMenu) {
@@ -1764,8 +1834,8 @@ export function PlannerApp() {
     sortMode: todoSortMode,
   });
 
-  const bottomGridStyle = (schedulePanelHeight
-    ? { '--schedule-panel-height': `${schedulePanelHeight}px` }
+  const bottomGridStyle = (monthSchedulePanelHeight
+    ? { '--schedule-panel-height': `${monthSchedulePanelHeight}px` }
     : undefined) as CSSProperties | undefined;
 
   if (!configured || !supabase) {
@@ -2028,6 +2098,7 @@ export function PlannerApp() {
           locale={locale}
           onFocusDateChange={setFocusDate}
           onSelectItem={handleOpenItem}
+          onViewTypeChange={handleCalendarViewTypeChange}
           timezone={timezone}
         />
         <TodoRail

@@ -17,6 +17,7 @@ type CalendarFullProps = {
   locale: string;
   onFocusDateChange: (date: Date) => void;
   onSelectItem: (item: Item, launchOrigin: LaunchOrigin | null) => void;
+  onViewTypeChange: (viewType: string) => void;
   timezone: string;
 };
 
@@ -242,6 +243,7 @@ export function CalendarFull({
   locale,
   onFocusDateChange,
   onSelectItem,
+  onViewTypeChange,
   timezone,
 }: CalendarFullProps) {
   const calendarRef = useRef<FullCalendar | null>(null);
@@ -298,12 +300,13 @@ export function CalendarFull({
 
   const handleDatesSet = useCallback(
     (args: DatesSetArg) => {
+      onViewTypeChange(args.view.type);
       const activeDate = args.view.calendar.getDate();
       if (!sameDate(activeDate, focusDate)) {
         onFocusDateChange(activeDate);
       }
     },
-    [focusDate, onFocusDateChange]
+    [focusDate, onFocusDateChange, onViewTypeChange]
   );
 
   const handleEventClick = useCallback(
