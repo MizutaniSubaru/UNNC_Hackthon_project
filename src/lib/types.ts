@@ -40,6 +40,26 @@ export type ParseResult = {
   type: ItemType;
 };
 
+export type ParseExtractedFields = {
+  duration_minutes: number | null;
+  location: string;
+  priority: Priority;
+  time: {
+    due_date: string | null;
+    end_at: string | null;
+    is_all_day: boolean;
+    start_at: string | null;
+    timezone: string;
+  };
+  title: string;
+};
+
+export type ParseResponse = {
+  extracted_fields: ParseExtractedFields;
+  mode: 'ai' | 'fallback';
+  result: ParseResult;
+};
+
 export type CreateItemPayload = {
   due_date: string | null;
   end_at: string | null;

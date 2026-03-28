@@ -1,13 +1,11 @@
 'use client';
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import type { DatesSetArg, EventClickArg, EventContentArg, EventInput } from '@fullcalendar/core';
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import { GROUPS } from '@/lib/constants';
 import { createLaunchOrigin } from '@/lib/launch-origin';
 import { formatEventTimeRange } from '@/lib/time';
 import type { Item, LaunchOrigin } from '@/lib/types';
@@ -52,8 +50,6 @@ function toCalendarEvent(item: Item, locale: string, timezone: string): EventInp
   if (!start) {
     return null;
   }
-
-  const group = GROUPS.find((entry) => entry.key === item.group_key);
 
   return {
     allDay: item.is_all_day,
@@ -137,6 +133,63 @@ function MonthEventCard({
   );
 }
 
+type TimeGridEventSurfaceProps = {
+  accentColor: string;
+  ariaHidden?: boolean;
+  backgroundColor: string;
+  borderColor: string;
+  className: string;
+  frameRef?: React.Ref<HTMLDivElement>;
+  locationText: string;
+  showMeta: boolean;
+  timeLabel: string;
+  title: string;
+};
+
+function TimeGridEventSurface({
+  accentColor,
+  ariaHidden,
+  backgroundColor,
+  borderColor,
+  className,
+  frameRef,
+  locationText,
+  showMeta,
+  timeLabel,
+  title,
+}: TimeGridEventSurfaceProps) {
+  return (
+    <div
+      aria-hidden={ariaHidden}
+      ref={frameRef}
+      className={className}
+      style={{
+        background: backgroundColor,
+        borderColor,
+        borderStyle: 'solid',
+        borderWidth: 1,
+      }}
+    >
+      <span aria-hidden="true" className="planner-calendar-week-event__accent" style={{ background: accentColor }} />
+      <div className="planner-calendar-week-event__body">
+        <span className="planner-calendar-week-event__title">{title}</span>
+        {showMeta ? (
+          <span className="planner-calendar-week-event__meta-group">
+            <span className="planner-calendar-week-event__meta planner-calendar-week-event__meta--time">
+              {timeLabel}
+            </span>
+            {locationText ? (
+              <span className="planner-calendar-week-event__meta planner-calendar-week-event__meta--location">
+                {locationText}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 type TimeGridEventCardProps = {
   locationLabel: string;
   timeLabel: string;
@@ -154,16 +207,14 @@ function TimeGridEventCard({
 }: TimeGridEventCardProps) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const measureRef = useRef<HTMLDivElement | null>(null);
-  const measureTimeRef = useRef<HTMLSpanElement | null>(null);
-  const [compact, setCompact] = useState(false);
-  const locationText = locationLabel || '\u00a0';
+  const [showMeta, setShowMeta] = useState(false);
+  const locationText = locationLabel.trim();
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
     const measure = measureRef.current;
-    const measureTime = measureTimeRef.current;
 
-    if (!frame || !measure || !measureTime) {
+    if (!frame || !measure) {
       return;
     }
 
@@ -180,11 +231,9 @@ function TimeGridEventCard({
 
       measure.style.width = `${clientWidth}px`;
 
-      const fitsHeight = measure.scrollHeight <= clientHeight + 1;
-      const fitsTime = measureTime.scrollWidth <= measureTime.clientWidth + 1;
-      const nextCompact = !(fitsHeight && fitsTime);
+      const nextShowMeta = measure.scrollHeight <= clientHeight + 1;
 
-      setCompact((current) => (current === nextCompact ? current : nextCompact));
+      setShowMeta((current) => (current === nextShowMeta ? current : nextShowMeta));
     };
 
     const scheduleUpdate = () => {
@@ -244,72 +293,32 @@ function TimeGridEventCard({
   return (
     <div
       aria-label={tooltip}
-      className={`planner-calendar-week-event${compact ? ' planner-calendar-week-event--compact' : ''}`}
+      className="planner-calendar-week-event"
       title={tooltip}
     >
-      <div ref={frameRef} className="planner-calendar-week-event__frame" style={{ background: backgroundColor, borderColor: borderColor, borderWidth: 1, borderStyle: 'solid' }}>
-        <span aria-hidden="true" className="planner-calendar-week-event__accent" style={{ background: accentColor }} />
-        <div className="planner-calendar-week-event__body">
-          <span className="planner-calendar-week-event__title">{title}</span>
-          {compact ? null : (
-            <span className="planner-calendar-week-event__meta-group">
-              <span className="planner-calendar-week-event__meta planner-calendar-week-event__meta--time">
-                {timeLabel}
-              </span>
-              <span className="planner-calendar-week-event__meta planner-calendar-week-event__meta--location">
-                {locationText}
-              </span>
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div aria-hidden="true" className="planner-calendar-week-event__layer" />
-      <div
-        aria-hidden="true"
+      <TimeGridEventSurface
+        accentColor={accentColor}
+        backgroundColor={backgroundColor}
+        borderColor={borderColor}
+        className={`planner-calendar-week-event__frame${showMeta ? '' : ' planner-calendar-week-event__frame--title-only'}`}
+        frameRef={frameRef}
+        locationText={locationText}
+        showMeta={showMeta}
+        timeLabel={timeLabel}
+        title={title}
+      />
+      <TimeGridEventSurface
+        accentColor={accentColor}
+        ariaHidden={true}
+        backgroundColor={backgroundColor}
+        borderColor={borderColor}
         className="planner-calendar-week-event__measure"
-        ref={measureRef}
-        style={{ background: backgroundColor, borderColor: borderColor, borderWidth: 1, borderStyle: 'solid' }}
-      >
-        <span className="planner-calendar-week-event__meta">
-          <span className="planner-calendar-week-event__meta-icon">
-            <svg
-              height="24"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="m22 17v-5a6 6 0 0 0-4-5.659v-.841A2 2 0 0 0 16 2h-2V1a1 1 0 0 0-2 0v1H9V1a1 1 0 0 0-2 0v1H5a2 2 0 0 0-2 2v.841A6 6 0 0 0 1 12v5a3 3 0 0 0 3 3h2v2a1 1 0 0 0 2 0v-2h6v2a1 1 0 0 0 2 0v-2h2a3 3 0 0 0 3-3ZM16 4a8 8 0 0 0-8 8v5H5v-5a10 10 0 0 1 10-10h1Zm-1 15h-4v-3h4Zm4-2h-2v-2a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v2H6v-4a1 1 0 0 0-1-1H3v-2h2a3 3 0 0 0 3-3v-1h8v1a3 3 0 0 0 3 3h2v2h-2a1 1 0 0 0-1 1v4Z"
-                fill="currentColor"
-                fillRule="evenodd"
-              />
-            </svg>
-          </span>
-          <span className="planner-calendar-week-event__meta-label">
-            {timeLabel}
-          </span>
-        </span>
-        <span className="planner-calendar-week-event__meta">
-          <span className="planner-calendar-week-event__meta-icon">
-            <svg
-              height="24"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M18 2a3 3 0 0 0-3 3v2H9V5a3 3 0 0 0-6 0v2H1v2h2v9a3 3 0 0 0 3 3h2v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2h2a3 3 0 0 0 3-3v-9h2V8h-2V6a3 3 0 0 0-3-3ZM8 20H6v-2h2Zm10 0h-8v-2h8Zm-1-6H7v-2h10Zm0-4H7V8h10Z"
-                fill="currentColor"
-                fillRule="evenodd"
-              />
-            </svg>
-          </span>
-          <span className="planner-calendar-week-event__meta-label">
-            {locationText}
-          </span>
-        </span>
-      </div>
+        frameRef={measureRef}
+        locationText={locationText}
+        showMeta={true}
+        timeLabel={timeLabel}
+        title={title}
+      />
     </div>
   );
 }
@@ -402,10 +411,9 @@ export function CalendarFull({
         .filter(Boolean)
         .join(' | ');
       const isCrossDaySegment = args.event.allDay && !(args.isStart && args.isEnd);
-      const parts = args.event.id.split('_');
-      // FullCalendar events typically have ID matches or we can look it up if passed directly.
-      // But we mapped item.group_key directly to extendedProps or it can be derived. Let's check eventProps.
-      const groupKey = args.event.classNames.find(c => c.startsWith('planner-calendar-event--'))?.replace('planner-calendar-event--', '');
+      const groupKey = args.event.classNames
+        .find((className) => className.startsWith('planner-calendar-event--'))
+        ?.replace('planner-calendar-event--', '');
 
       if (args.view.type === 'dayGridMonth' || args.event.allDay) {
         return <MonthEventCard crossDay={isCrossDaySegment} title={title} tooltip={tooltip} groupKey={groupKey} />;
@@ -442,6 +450,8 @@ export function CalendarFull({
           displayEventTime={false}
           eventClick={handleEventClick}
           eventContent={renderEventContent}
+          eventMinHeight={26}
+          eventShortHeight={36}
           events={events}
           firstDay={1}
           headerToolbar={headerToolbar}

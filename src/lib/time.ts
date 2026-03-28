@@ -220,6 +220,18 @@ export function isEndAfterStart(start: DateLike, end: DateLike) {
   return endDate.getTime() > startDate.getTime();
 }
 
+export function getDurationMinutes(start: DateLike, end: DateLike) {
+  const startDate = toDate(start);
+  const endDate = toDate(end);
+
+  if (!startDate || !endDate) {
+    return null;
+  }
+
+  const diffMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+  return diffMinutes > 0 ? diffMinutes : null;
+}
+
 export function addMinutes(value: string, minutes: number) {
   const date = new Date(value);
   date.setMinutes(date.getMinutes() + minutes);

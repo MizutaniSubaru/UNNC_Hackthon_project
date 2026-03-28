@@ -641,7 +641,7 @@ function formatTime(hour: number, minute: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
 }
 
-function parseTimeRange(text: string): TimeRange | null {
+export function parseTimeRange(text: string): TimeRange | null {
   const chineseRange = text.match(
     /(?:(\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?(\d{1,2})(?:(?::|：)(\d{1,2})|点(?:(\d{1,2})分?)?(半)?)?\s*(?:到|至|~|～|-)\s*(?:(\u51cc\u6668|\u65e9\u4e0a|\u4e0a\u5348|\u4e2d\u5348|\u4e0b\u5348|\u665a\u4e0a)\s*)?(\d{1,2})(?:(?::|：)(\d{1,2})|点(?:(\d{1,2})分?)?(半)?)?/u
   );

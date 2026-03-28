@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { QuoteView, QuotesResponse } from '@/lib/types';
 
-const ROTATE_INTERVAL_MS = 6000;
 const FADE_DURATION_MS = 360;
 const FETCH_LIMIT = 120;
 

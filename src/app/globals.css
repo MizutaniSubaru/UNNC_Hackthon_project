@@ -1349,14 +1349,18 @@ button:disabled {
 }
 
 .planner-calendar-month-event__title {
+  display: block;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   color: #17304f;
   font-size: 0.73rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
-  text-overflow: clip;
+  text-overflow: ellipsis;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 .planner-calendar-week-event {
@@ -1407,6 +1411,7 @@ button:disabled {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+  overflow: hidden;
 }
 
 .planner-calendar-week-event__title,
@@ -1416,12 +1421,16 @@ button:disabled {
 }
 
 .planner-calendar-week-event__title {
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.88rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 .planner-calendar-week-event__meta-group {
@@ -1429,6 +1438,7 @@ button:disabled {
   flex-direction: column;
   gap: 2px;
   margin-top: 3px;
+  min-width: 0;
 }
 
 .planner-calendar-week-event__meta {
@@ -1451,11 +1461,20 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
-.planner-calendar-week-event--compact .planner-calendar-week-event__body {
+.planner-calendar-week-event__frame.planner-calendar-week-event__frame--title-only {
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.planner-calendar-week-event__frame.planner-calendar-week-event__frame--title-only .planner-calendar-week-event__accent {
+  flex: 0 0 2px;
+}
+
+.planner-calendar-week-event__frame.planner-calendar-week-event__frame--title-only .planner-calendar-week-event__body {
   justify-content: center;
 }
 
-.planner-calendar-week-event--compact .planner-calendar-week-event__meta-group {
+.planner-calendar-week-event__frame.planner-calendar-week-event__frame--title-only .planner-calendar-week-event__meta-group {
   display: none;
 }
 
@@ -1463,7 +1482,8 @@ button:disabled {
   min-height: 100%;
 }
 
-.planner-fullcalendar .fc .planner-fullcalendar__event.fc-timegrid-event.fc-timegrid-event-short .planner-calendar-week-event__frame {
+.planner-fullcalendar .fc .planner-fullcalendar__event.fc-timegrid-event.fc-timegrid-event-short .planner-calendar-week-event__frame,
+.planner-fullcalendar .fc .planner-fullcalendar__event.fc-timegrid-event.fc-timegrid-event-short .planner-calendar-week-event__measure {
   padding-top: 4px;
   padding-bottom: 4px;
 }

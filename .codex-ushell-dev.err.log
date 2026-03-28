@@ -1,0 +1,2 @@
+$ next dev --hostname 0.0.0.0 --webpack
+error: script "dev" exited with code 58
