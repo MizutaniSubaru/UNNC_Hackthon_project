@@ -30,23 +30,13 @@ After checking WeChat and email in the morning, a student pastes a mixed schedul
 4. Calendar views (month/week-style) plus filtered to-do rail.
 5. Activity history for created, updated, completed, and deleted items.
 6. OCR-based image text extraction for planning inputs(beta).
-7. PDF courseware to markdown notes workflow (beta).
-8. Calendar export utilities.
+7. Calendar export utilities.
 
 ## Other Features
 
 1. Quote rotation UX elements.
 2. A simple pomodoro timer.
-
-## Core Value Proposition
-
-**One-sentence value proposition:**
-
-For university students managing academic and personal commitments, Orbit Planner turns natural-language and screenshot planning requests into an editable calendar-and-task workspace, so they can capture and act on commitments in seconds instead of manually entering forms across multiple tools, unlike traditional calendars, standalone to-do apps, or generic chatbots that do not maintain structured schedule state.
-
-**Brief explanation (2-4 sentences):**
-
-The product is designed for the real input students already have: mixed Chinese-English phrases, informal time expressions, and batches of unrelated tasks written in one burst. Instead of forcing the user to choose between "calendar app" and "task app," Orbit Planner keeps both views connected and adds history, search, and export on top. The confirmation-first flow also makes the AI useful without forcing blind trust.
+3. PDF courseware to markdown notes workflow (beta).
 
 ## AI & Technical Approach
 
@@ -61,6 +51,48 @@ The product is designed for the real input students already have: mixed Chinese-
 | OCR/PDF     | Tesseract.js, pdfjs-dist, @napi-rs/canvas                              |
 | Calendar/UI | FullCalendar, lucide-react, @ncdai/react-wheel-picker                  |
 
+**Project Structure:**
+
+```text
+UNNC_Hackthon_project/
+  src/
+    app/
+      api/
+        history/           # activity history APIs
+        items/             # item CRUD APIs
+        nl/parse/          # natural-language parse API
+        nl/notes/          # PDF courseware -> notes API
+        quotes/            # quote APIs
+        search/            # semantic search APIs
+      page.tsx             # app entry page
+      layout.tsx           # root layout
+      globals.css          # global styles
+    components/            # UI components and planner views
+    lib/                   # business logic, AI, OCR, formatting, tests
+  supabase/
+    schema.sql             # database schema and policies
+    quotes.seed.sql        # optional quote seed data
+  package.json             # dependencies and scripts
+```
+
+**Dependencies:**
+
+Dependencies are defined in [package.json](./package.json).
+
+Key runtime dependencies include:
+
+- Framework/runtime: `next`, `react`, `react-dom`
+- Database: `@supabase/supabase-js`, `@supabase/ssr`, `pg`
+- AI: `ai`, `openai`
+- OCR/PDF: `tesseract.js`, `pdfjs-dist`, `@napi-rs/canvas`
+- Calendar/UI: `@fullcalendar/*`, `framer-motion`, `lucide-react`, `clsx`
+
+Key dev dependencies include:
+
+- `typescript`, `eslint`, `eslint-config-next`
+- `tailwindcss`, `@tailwindcss/postcss`, `daisyui`
+- `bun-types`, `@types/*`
+
 **Role of AI in the product:**
 
 The AI layer interprets bilingual natural-language planning requests, including colloquial Chinese time phrases, mixed-language titles, and summary-style search queries. It helps split one input into multiple schedules, infer structured fields, understand semantic search intent, and rerank results when keyword matching alone is not enough. Around that AI layer, deterministic code handles fallback parsing, item payload normalization, history logging, undo behavior, and calendar export so the planner still behaves predictably when AI output is incomplete or unavailable.
@@ -68,6 +100,16 @@ The AI layer interprets bilingual natural-language planning requests, including 
 **Why AI is the right approach here:**
 
 A simpler rule-based system can handle explicit formats, but it struggles with the kinds of inputs this product targets: mixed Chinese-English phrasing, vague but common campus expressions, multi-schedule messages, and queries like "what did I do last week with my advisor?" Orbit Planner therefore uses a hybrid approach: AI handles language variability and semantic intent, while deterministic rules enforce reliable structure and safe fallbacks. This is also backed by automated Bun tests that cover parsing, provider fallback, search behavior, editor timing, and item payload normalization, which helps keep the AI-driven experience stable enough for real use.
+
+## Core Value Proposition
+
+**One-sentence value proposition:**
+
+For university students managing academic and personal commitments, Orbit Planner turns natural-language and screenshot planning requests into an editable calendar-and-task workspace, so they can capture and act on commitments in seconds instead of manually entering forms across multiple tools, unlike traditional calendars, standalone to-do apps, or generic chatbots that do not maintain structured schedule state.
+
+**Brief explanation:**
+
+The product is designed for the real input students already have: mixed Chinese-English phrases, informal time expressions, and batches of unrelated tasks written in one burst. Instead of forcing the user to choose between "calendar app" and "task app," Orbit Planner keeps both views connected and adds history, search, and export on top. The confirmation-first flow also makes the AI useful without forcing blind trust.
 
 ## Key Assumptions
 
@@ -91,4 +133,4 @@ Google Calendar and Apple Calendar are strong for structured event entry, but th
 
 **What makes our approach different:**
 
-Orbit Planner combines bilingual natural-language capture, a confirmation-first review step, unified calendar and to-do management, semantic search across saved items, history undo, and ICS/webcal export in one lightweight planner. The key trade-off is deliberate: we optimize for fast intake of messy real student input, not for heavyweight enterprise workflow depth.
+Orbit Planner combines bilingual natural-language capture, a confirmation-first review step, unified calendar and to-do management, semantic search across saved items, history undo, and ICS export in one lightweight planner. The key trade-off is deliberate: we optimize for intake of messy real student input, not for heavyweight enterprise workflow depth.
