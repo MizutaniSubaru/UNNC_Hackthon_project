@@ -80,3 +80,11 @@ export function downloadICalendar(items: Item[], filename: string = 'calendar.ic
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Generate a data URL for planner items in iCalendar format.
+ */
+export function generateICalendarDataUrl(items: Item[]) {
+  const icsContent = generateICalendar(items);
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`;
+}
