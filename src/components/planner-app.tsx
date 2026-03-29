@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import type { CSSProperties, ChangeEvent } from 'react';
-import { Copy, ImagePlus, NotebookPen, Upload, X } from 'lucide-react';
+import { Copy, ImagePlus, Mic, NotebookPen, Upload, X } from 'lucide-react';
 import { CalendarFull } from '@/components/calendar-full';
 import { ItemEditor } from '@/components/item-editor';
 import { PlannerEditorFields } from '@/components/planner-editor-fields';
@@ -78,6 +78,42 @@ type NotesResult = {
   pageCount: number;
   processedPages: number;
 };
+
+type SpeechRecognitionAlternativeLike = {
+  transcript: string;
+};
+
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternativeLike;
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex?: number;
+  results?: ArrayLike<SpeechRecognitionResultLike>;
+};
+
+type SpeechRecognitionErrorEventLike = {
+  error?: string;
+};
+
+type SpeechRecognitionInstanceLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onstart: (() => void) | null;
+  abort: () => void;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionConstructorLike = new () => SpeechRecognitionInstanceLike;
+
+type SupportedSpeechLanguage = 'en-US' | 'zh-CN';
 
 type ConfirmationModalProps = {
   activeDraftId: string | null;
@@ -147,6 +183,84 @@ type SearchResultsPanelProps = {
 const MONTH_CALENDAR_VIEW = 'dayGridMonth';
 const WEEK_CALENDAR_VIEW = 'timeGridTwoDayRail';
 const MAX_NOTES_PDF_BYTES = 20 * 1024 * 1024;
+
+function getSpeechRecognitionConstructor() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: SpeechRecognitionConstructorLike;
+    webkitSpeechRecognition?: SpeechRecognitionConstructorLike;
+  };
+
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+}
+
+function appendTranscribedText(baseText: string, transcript: string) {
+  const normalizedTranscript = transcript.replace(/\s+/g, ' ').trim();
+  if (!normalizedTranscript) {
+    return baseText;
+  }
+
+  if (!baseText.trim()) {
+    return normalizedTranscript;
+  }
+
+  const separator = /[\n\r]$/.test(baseText) ? '' : '\n';
+  return `${baseText}${separator}${normalizedTranscript}`;
+}
+
+function extractFinalSpeechTranscript(event: SpeechRecognitionEventLike) {
+  if (!event.results) {
+    return '';
+  }
+
+  const startIndex = typeof event.resultIndex === 'number' ? event.resultIndex : 0;
+  const chunks: string[] = [];
+
+  for (let index = startIndex; index < event.results.length; index += 1) {
+    const result = event.results[index];
+    if (!result || result.isFinal === false || result.length === 0) {
+      continue;
+    }
+
+    const transcript = result[0]?.transcript;
+    if (typeof transcript === 'string' && transcript.trim()) {
+      chunks.push(transcript.trim());
+    }
+  }
+
+  return chunks.join(' ');
+}
+
+function mapSpeechRecognitionError(error: string | undefined, locale: string) {
+  const isChinese = locale.startsWith('zh');
+
+  switch (error) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return isChinese
+        ? '需要麦克风权限才能使用语音输入。'
+        : 'Microphone permission is required for voice input.';
+    case 'audio-capture':
+      return isChinese
+        ? '未检测到可用的麦克风设备。'
+        : 'No usable microphone was detected.';
+    case 'network':
+      return isChinese
+        ? '语音识别网络异常，请稍后重试。'
+        : 'Speech recognition network error. Please try again.';
+    case 'no-speech':
+      return isChinese
+        ? '未检测到语音，请重试。'
+        : 'No speech was detected. Please try again.';
+    default:
+      return isChinese
+        ? '语音输入失败，请重试。'
+        : 'Voice input failed. Please try again.';
+  }
+}
 
 function resolveLocale() {
   if (typeof navigator === 'undefined') {
@@ -320,6 +434,131 @@ function ComposerPanel({
 }) {
   const isChinese = locale.startsWith('zh');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstanceLike | null>(null);
+  const composerTextRef = useRef(text);
+  const [speechLanguage, setSpeechLanguage] = useState<SupportedSpeechLanguage>(() =>
+    locale.startsWith('zh') ? 'zh-CN' : 'en-US'
+  );
+  const [speechListening, setSpeechListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const speechSupported = Boolean(getSpeechRecognitionConstructor());
+
+  useEffect(() => {
+    composerTextRef.current = text;
+  }, [text]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        // Ignore speech API cleanup errors.
+      }
+
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  function stopSpeechRecognition() {
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // Ignore speech API stop errors.
+    }
+  }
+
+  function toggleSpeechLanguage() {
+    if (speechListening) {
+      return;
+    }
+
+    setSpeechLanguage((current) => (current === 'zh-CN' ? 'en-US' : 'zh-CN'));
+    setSpeechError(null);
+  }
+
+  function handleVoiceInput() {
+    if (busy) {
+      return;
+    }
+
+    if (speechListening) {
+      stopSpeechRecognition();
+      return;
+    }
+
+    const SpeechRecognitionClass = getSpeechRecognitionConstructor();
+    if (!SpeechRecognitionClass) {
+      setSpeechError(
+        isChinese
+          ? '当前浏览器不支持语音输入，请使用 Chrome 或 Edge。'
+          : 'Voice input is not supported in this browser. Please use Chrome or Edge.'
+      );
+      return;
+    }
+
+    const recognition = new SpeechRecognitionClass();
+    recognition.lang = speechLanguage;
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      setSpeechListening(true);
+      setSpeechError(null);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = extractFinalSpeechTranscript(event);
+      if (!transcript) {
+        return;
+      }
+
+      const nextText = appendTranscribedText(composerTextRef.current, transcript);
+      composerTextRef.current = nextText;
+      setComposerText(nextText);
+    };
+
+    recognition.onerror = (event) => {
+      const code = typeof event.error === 'string' ? event.error : undefined;
+      setSpeechError(mapSpeechRecognitionError(code, locale));
+      setSpeechListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onend = () => {
+      setSpeechListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch {
+      setSpeechError(
+        isChinese
+          ? '语音输入启动失败，请重试。'
+          : 'Failed to start voice input. Please try again.'
+      );
+      setSpeechListening(false);
+      recognitionRef.current = null;
+    }
+  }
+
+  const speechLanguageLabel = speechLanguage === 'zh-CN' ? '中' : 'EN';
+  const speechHintText = speechError
+    ? speechError
+    : !speechSupported
+      ? isChinese
+        ? '当前浏览器不支持语音输入。'
+        : 'Voice input is not supported in this browser.'
+      : speechListening
+        ? isChinese
+          ? `正在听写（${speechLanguage === 'zh-CN' ? '中文' : 'English'}），再次点击麦克风可停止。`
+          : `Listening (${speechLanguage === 'zh-CN' ? 'Chinese' : 'English'}). Click the mic again to stop.`
+        : isChinese
+          ? `点击麦克风开始语音输入，当前语言：${speechLanguage === 'zh-CN' ? '中文' : 'English'}。`
+          : `Click the microphone to start voice input. Current language: ${speechLanguage === 'zh-CN' ? 'Chinese' : 'English'}.`;
+
   const uploadLabel = imageSelection
     ? isChinese
       ? '更换图片'
@@ -350,23 +589,67 @@ function ComposerPanel({
       </div>
 
       <div className="planner-stack planner-stack--compact">
-        <textarea
-          className="composer-textarea"
-          onChange={(event) => setComposerText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !busy && canAnalyze) {
-              event.preventDefault();
-              onAnalyze();
+        <div className="composer-textarea-shell">
+          <textarea
+            className="composer-textarea composer-textarea--with-voice"
+            onChange={(event) => {
+              composerTextRef.current = event.target.value;
+              setComposerText(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !busy && canAnalyze) {
+                event.preventDefault();
+                onAnalyze();
+              }
+            }}
+            placeholder={
+              isChinese
+                ? '例如：明天下午 3 点到 4 点半和导师开会；或者：从晚上 8 点开始健身 45 分钟'
+                : 'Example: Meet my advisor tomorrow from 3:00 PM to 4:30 PM, or Start a 45-minute workout at 8:00 PM tonight'
             }
-          }}
-          placeholder={
-            isChinese
-              ? '例如：明天下午 3 点到 4 点半和导师开会；或者：从晚上 8 点开始健身 45 分钟'
-              : 'Example: Meet my advisor tomorrow from 3:00 PM to 4:30 PM, or Start a 45-minute workout at 8:00 PM tonight'
-          }
-          rows={4}
-          value={text}
-        />
+            rows={4}
+            value={text}
+          />
+
+          <div className="composer-textarea__tools">
+            <MotionButton
+              aria-label={
+                speechListening
+                  ? isChinese
+                    ? '停止语音输入'
+                    : 'Stop voice input'
+                  : isChinese
+                    ? '开始语音输入'
+                    : 'Start voice input'
+              }
+              aria-pressed={speechListening}
+              className={`planner-button planner-button--ghost composer-voice-button ${speechListening ? 'is-listening' : ''}`}
+              disabled={busy}
+              motionPreset="subtle"
+              onClick={handleVoiceInput}
+              type="button"
+            >
+              <span className="planner-button__icon" aria-hidden="true">
+                <Mic size={16} />
+              </span>
+            </MotionButton>
+
+            <MotionButton
+              aria-label={isChinese ? '切换语音识别语言' : 'Switch voice input language'}
+              className="planner-button planner-button--ghost composer-voice-language"
+              disabled={busy || speechListening}
+              motionPreset="subtle"
+              onClick={toggleSpeechLanguage}
+              type="button"
+            >
+              {speechLanguageLabel}
+            </MotionButton>
+          </div>
+        </div>
+
+        <p className={`composer-voice-note ${speechError ? 'composer-voice-note--error' : ''}`}>
+          {speechHintText}
+        </p>
 
         <input
           accept="image/*"

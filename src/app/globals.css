@@ -679,6 +679,76 @@ button:disabled {
     0 18px 36px rgba(44, 69, 115, 0.08);
 }
 
+.composer-textarea-shell {
+  position: relative;
+}
+
+.composer-textarea--with-voice {
+  padding-right: 106px;
+}
+
+.composer-textarea__tools {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer-voice-button,
+.composer-voice-language {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(20, 33, 61, 0.18);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 18px rgba(20, 33, 61, 0.12);
+}
+
+.composer-voice-language {
+  min-width: 40px;
+  padding-inline: 10px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+}
+
+.composer-voice-button.is-listening {
+  border-color: rgba(197, 63, 63, 0.72);
+  color: #fff;
+  background: linear-gradient(135deg, #ce4e4e 0%, #9b2f2f 100%);
+  animation: composer-voice-pulse 1.35s ease-in-out infinite;
+}
+
+@keyframes composer-voice-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(197, 63, 63, 0.22);
+  }
+
+  50% {
+    box-shadow: 0 0 0 9px rgba(197, 63, 63, 0);
+  }
+}
+
+.composer-voice-note {
+  margin: 0;
+  color: rgba(44, 69, 115, 0.86);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.composer-voice-note--error {
+  color: #8f3523;
+}
+
 .composer-file-input {
   display: none;
 }
@@ -2591,6 +2661,10 @@ button:disabled {
 
   .composer-upload-card {
     flex-direction: column;
+  }
+
+  .composer-textarea--with-voice {
+    padding-right: 100px;
   }
 
   .composer-upload-card__preview-wrap {
