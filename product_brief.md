@@ -30,13 +30,13 @@ After checking WeChat and email in the morning, a student pastes a mixed schedul
 4. Calendar views (month/week-style) plus filtered to-do rail.
 5. Activity history for created, updated, completed, and deleted items.
 6. OCR-based image text extraction for planning inputs(beta).
-7. PDF courseware to markdown notes workflow (beta).
-8. Calendar export utilities.
+7. Calendar export utilities.
 
 ## Other Features
 
 1. Quote rotation UX elements.
 2. A simple pomodoro timer.
+3. PDF courseware to markdown notes workflow (beta).
 
 ## Core Value Proposition
 
