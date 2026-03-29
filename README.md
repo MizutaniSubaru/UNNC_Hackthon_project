@@ -140,7 +140,7 @@ If AI keys are not configured, the app can still run with heuristic fallback par
 
 #### Step 4: Supabase Database Setup (Create Tables)
 
-1. Open your Supabase project dashboard.
+1. Open [Supabase project dashboard.](https://supabase.com/),Register your account and create your project.
 2. Go to `SQL Editor`.
 3. Run the SQL from [supabase/schema.sql](./supabase/schema.sql).
 4. Confirm these tables exist:
@@ -149,16 +149,6 @@ If AI keys are not configured, the app can still run with heuristic fallback par
    - `public.activity_logs`
    - `public.quotes`
 5. (Optional) Run [supabase/quotes.seed.sql](./supabase/quotes.seed.sql) to preload quote data.
-
-Recommended verification SQL:
-
-```sql
-select tablename
-from pg_tables
-where schemaname = 'public'
-  and tablename in ('groups', 'items', 'activity_logs', 'quotes')
-order by tablename;
-```
 
 Then copy Supabase values into `.env.local`:
 
