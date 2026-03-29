@@ -22,7 +22,7 @@ This project is designed as a practical hackathon product: fast setup, low frict
 7. PDF courseware to markdown notes workflow (beta).
 8. Calendar export utilities.
 
-## Other Features
+### Other Features
 
 1. Quote rotation UX elements.
 2. A simple pomodoro timer.
