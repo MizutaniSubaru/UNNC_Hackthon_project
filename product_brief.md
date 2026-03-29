@@ -61,6 +61,48 @@ The product is designed for the real input students already have: mixed Chinese-
 | OCR/PDF     | Tesseract.js, pdfjs-dist, @napi-rs/canvas                              |
 | Calendar/UI | FullCalendar, lucide-react, @ncdai/react-wheel-picker                  |
 
+**4. Project Structure:**
+
+```text
+UNNC_Hackthon_project/
+  src/
+    app/
+      api/
+        history/           # activity history APIs
+        items/             # item CRUD APIs
+        nl/parse/          # natural-language parse API
+        nl/notes/          # PDF courseware -> notes API
+        quotes/            # quote APIs
+        search/            # semantic search APIs
+      page.tsx             # app entry page
+      layout.tsx           # root layout
+      globals.css          # global styles
+    components/            # UI components and planner views
+    lib/                   # business logic, AI, OCR, formatting, tests
+  supabase/
+    schema.sql             # database schema and policies
+    quotes.seed.sql        # optional quote seed data
+  package.json             # dependencies and scripts
+```
+
+**Dependencies:**
+
+Dependencies are defined in [package.json](./package.json).
+
+Key runtime dependencies include:
+
+- Framework/runtime: `next`, `react`, `react-dom`
+- Database: `@supabase/supabase-js`, `@supabase/ssr`, `pg`
+- AI: `ai`, `openai`
+- OCR/PDF: `tesseract.js`, `pdfjs-dist`, `@napi-rs/canvas`
+- Calendar/UI: `@fullcalendar/*`, `framer-motion`, `lucide-react`, `clsx`
+
+Key dev dependencies include:
+
+- `typescript`, `eslint`, `eslint-config-next`
+- `tailwindcss`, `@tailwindcss/postcss`, `daisyui`
+- `bun-types`, `@types/*`
+
 **Role of AI in the product:**
 
 The AI layer interprets bilingual natural-language planning requests, including colloquial Chinese time phrases, mixed-language titles, and summary-style search queries. It helps split one input into multiple schedules, infer structured fields, understand semantic search intent, and rerank results when keyword matching alone is not enough. Around that AI layer, deterministic code handles fallback parsing, item payload normalization, history logging, undo behavior, and calendar export so the planner still behaves predictably when AI output is incomplete or unavailable.
