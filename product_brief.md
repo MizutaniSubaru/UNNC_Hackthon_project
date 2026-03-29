@@ -44,7 +44,7 @@ After checking WeChat and email in the morning, a student pastes a mixed schedul
 
 For university students managing academic and personal commitments, Orbit Planner turns natural-language and screenshot planning requests into an editable calendar-and-task workspace, so they can capture and act on commitments in seconds instead of manually entering forms across multiple tools, unlike traditional calendars, standalone to-do apps, or generic chatbots that do not maintain structured schedule state.
 
-**Brief explanation (2-4 sentences):**
+**Brief explanation:**
 
 The product is designed for the real input students already have: mixed Chinese-English phrases, informal time expressions, and batches of unrelated tasks written in one burst. Instead of forcing the user to choose between "calendar app" and "task app," Orbit Planner keeps both views connected and adds history, search, and export on top. The confirmation-first flow also makes the AI useful without forcing blind trust.
 
