@@ -134,3 +134,60 @@ Google Calendar and Apple Calendar are strong for structured event entry, but th
 **What makes our approach different:**
 
 Orbit Planner combines bilingual natural-language capture, a confirmation-first review step, unified calendar and to-do management, semantic search across saved items, history undo, and ICS export in one lightweight planner. The key trade-off is deliberate: we optimize for intake of messy real student input, not for heavyweight enterprise workflow depth.
+
+## A demonstration of some features.
+
+### Main interface
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/784ef9c4-8d2f-43a0-8567-d7d0d1fd0297" />
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/981e7b04-18e0-4b29-a179-a18a00abe56c" />
+<img width="584" height="1240" alt="image" src="https://github.com/user-attachments/assets/223ba3f4-06a6-4907-8313-0e3631be47ee" />
+
+### Batch import of multiple schedules
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/1fa4b6b3-08c1-4d5e-a6c7-502c9c258cb2" />
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/a4d47305-2852-40d0-b1ba-2d60f36ca08a" />
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/ee02353c-397c-4862-9474-a3e544f9672f" />
+
+### Allow users to manually modify parameters during the confirmation process,The figure illustrates the modification of time parameters.
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/4f60d1b9-7572-4632-bbe5-901e4298d144" />
+
+### Import TO-DOs.
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/fc6f22ce-2f92-43fe-83b2-f5ba5e70954f" />
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/2a0bb2ba-4642-4494-a979-bc3897daa1ba" />
+
+### AI fuzzy search for schedules.
+
+<img width="1270" height="560" alt="image" src="https://github.com/user-attachments/assets/c8f33ee6-aecb-4b35-99cb-b82298eaec6d" />
+
+### Recognize schedules from images and add them automatically.
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/fdfd76fb-d6da-45d2-851e-aee84ad5ae9e" />
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/51b17352-ec93-469f-9bca-6520f786e31f" />
+
+### To-Do List supports grouping and sorting.
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/df26a290-d374-422c-9fa9-8a4a71fa9f8c" />
+
+### Export the calendar as an ICS file. This allows you to import your schedule into programs such as Outlook or Apple Calendar.
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/9b126d83-93ca-4064-96b4-8c88d102410d" />
+<img width="2560" height="1262" alt="image" src="https://github.com/user-attachments/assets/c8a1ba19-3b8e-4390-8749-5c64908d3d5e" />
+
+### Lightweight Pomodoro components.
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/48d6f008-81a5-4818-bdd1-a1622a0ecb16" />
+<img width="980" height="712" alt="image" src="https://github.com/user-attachments/assets/ac55dcf2-13be-4116-8831-127232290d0b" />
+
+### A lightweight PDF recognition and summarization component.
+
+
+<img width="2544" height="1336" alt="image" src="https://github.com/user-attachments/assets/838644a3-0c10-49e4-b667-1287aea3a278" />
+
+
+
+
+
+
