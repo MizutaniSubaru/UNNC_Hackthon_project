@@ -2,12 +2,15 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-AI-assisted planning workspace for students, built with Next.js, Bun, and Supabase.
+### AI-assisted planning workspace for students, built with Next.js, Bun, and Supabase.
+
 
 ![photo_1_2026-03-29_13-14-35](https://github.com/user-attachments/assets/60108cf1-f086-48e7-bed7-093c11259bbe)
 <img width="2468" height="1463" alt="image" src="https://github.com/user-attachments/assets/b19446c9-2d91-4eef-83b0-f8488896b3cb" />
 
-### 1. Project Overview
+### We have provided a version for automatic deployment on Vercel. Please check [orbit planner](https://unnc-hackthon-project.vercel.app/) to experience.
+
+### Project Overview
 
 Orbit Planner helps students turn unstructured inputs into an executable study plan.
 You can type natural language, upload images, or upload courseware PDFs, then quickly organize content into calendar events, to-do items, and study notes.
