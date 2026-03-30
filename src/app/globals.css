@@ -2625,6 +2625,13 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.auth-card__email-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
 .auth-card__input {
   width: 100%;
   border: 1px solid var(--line);
@@ -2646,10 +2653,28 @@ button:disabled {
   margin-top: 4px;
 }
 
-.auth-card__submit,
-.auth-card__google {
+.auth-card__submit {
   width: 100%;
   justify-content: center;
+}
+
+.auth-card__verify-button {
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.auth-card__google {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  justify-self: center;
+}
+
+.auth-card__google svg {
+  width: 20px;
+  height: 20px;
 }
 
 .auth-card__error,
@@ -2718,6 +2743,14 @@ button:disabled {
 @media (max-width: 820px) {
   .planner-shell {
     padding: 28px 16px 40px;
+  }
+
+  .auth-card__email-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card__verify-button {
+    width: 100%;
   }
 
   .planner-button--auth-compact {
